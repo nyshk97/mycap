@@ -6,7 +6,7 @@ import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController!
-    private let capturer = ScreenCapturer()
+    let capture = CaptureService()
     /// 登録に失敗したホットキーの表示名（メニューバーに出す）
     private(set) var failedHotKeys: [String] = []
 
@@ -68,8 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func registerHotKeys() {
         let pairs: [(HotKeyBindings.Binding, () -> Void)] = [
-            (HotKeyBindings.region, { [weak self] in self?.captureRegion() }),
-            (HotKeyBindings.fullScreen, { Log.write("hotkey.not_implemented full_screen") }),
+            (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
+            (HotKeyBindings.fullScreen, { [weak self] in self?.capture.captureFullScreen() }),
             (HotKeyBindings.ocr, { Log.write("hotkey.not_implemented ocr") }),
             (HotKeyBindings.record, { Log.write("hotkey.not_implemented record") }),
         ]
@@ -99,20 +99,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #else
         return !NSRunningApplication.runningApplications(withBundleIdentifier: Self.cleanShotBundleID).isEmpty
         #endif
-    }
-
-    // MARK: - キャプチャ
-
-    /// Phase 1: 画面収録の許可の検証用の最小経路。撮れたかと許可の状態をログに出すだけ（保存・コピーは Phase 2）
-    func captureRegion() {
-        capturer.capture(.interactive) { url in
-            guard let url else {
-                Log.write("capture.cancelled")
-                return
-            }
-            let size = NSImage(contentsOf: url)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
-            Log.write("capture.region.captured path=\(url.path) px=\(size)")
-        }
     }
 
     // MARK: - メニューから呼ぶ
@@ -164,12 +150,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 検証フック（dev 版のみ）
 
     #if DEBUG
-    /// `--tcc`: 画面収録の許可の状態をログに出す（画面にもフォーカスにも触らない）
+    /// `--tcc`: 画面収録の許可の状態をログに出す
+    /// `--ingest <png>`: 既存の画像を撮影結果として保存・サムネイルの経路に流す（クリップボードには書かない）
+    /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる。クリップボードには書かない）
+    /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
+    /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
+    /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
+    /// `--close-all`: サムネイルを全部閉じる
+    /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
-        for cmd in args {
+        var queue = args
+        while !queue.isEmpty {
+            let cmd = queue.removeFirst()
+            func arg() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
             switch cmd {
             case "--tcc":
                 ScreenCapturer.logPermission(when: "hook")
+            case "--ingest":
+                if let path = arg() { capture.ingest(path: path) }
+            case "--full":
+                capture.captureFullScreen(copy: false)
+            case "--dump-thumbs":
+                Log.write("hook.thumbs count=\(capture.thumbnails.count) items=\(capture.thumbnails.dump())")
+            case "--hover":
+                capture.thumbnails.hoverNewest(true)
+            case "--unhover":
+                capture.thumbnails.hoverNewest(false)
+            case "--snapshot":
+                let path = arg() ?? "/tmp/mycap-snapshot.png"
+                Log.write("hook.snapshot path=\(path) ok=\(capture.thumbnails.snapshotNewest(to: path))")
+            case "--close-all":
+                capture.thumbnails.closeAll()
             default:
                 Log.write("hook.unknown \(cmd)")
             }

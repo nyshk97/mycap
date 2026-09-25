@@ -5,7 +5,7 @@
 ```bash
 mise run build          # Debug（mycap Dev）。署名 xcconfig が無ければ ad-hoc で通る
 mise run build-release  # Release（mycap）
-mise run test           # Sources/Core の純粋関数（ファイル名の規則 等）
+mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方）
 mise run run            # /Applications/mycap Dev.app に置いて起動し直す（旧プロセスの終了を待つ）
 ```
 
@@ -21,17 +21,36 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 ログは `~/Library/Logs/mycap/mycap-dev.log`（常用版は `mycap.log`）。先頭の語がイベント名:
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
-`capture.started` / `capture.finished` / `capture.cancelled` / `capture.region.captured` / `capture.skipped` /
+`capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.saved` / `capture.skipped` / `capture.save_failed` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|trashed|overflow` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
-## 検証フック（dev 版のみ・画面にもフォーカスにも触らない）
+## 検証フック（dev 版のみ・フォーカスを奪わない）
 
 常駐中の dev に引数を渡す（2 個目のプロセスは引数を既存インスタンスへ転送して終了する）。
+**保存先は `MYCAP_SAVE_DIR` で差し替えて起動し直してから撃つ**（`~/Downloads` を汚さない）。フックはクリップボードに書かない。
 
 ```bash
-open -n -g "/Applications/mycap Dev.app" --args --tcc
-tail -3 ~/Library/Logs/mycap/mycap-dev.log   # launch.forward_to_running と tcc.preflight granted=… when=hook
+S=<scratchpad>; mkdir -p $S/save $S/fx
+# fixture（大きさの違う画像。72dpi なのでピクセル = ポイント）
+I=Sources/Assets.xcassets/AppIcon.appiconset/icon_1024.png
+sips -z 540 960 $I --out $S/fx/wide.png; sips -z 900 300 $I --out $S/fx/tall.png
+sips -z 20 40 $I --out $S/fx/tiny.png;  sips -z 50 3000 $I --out $S/fx/strip.png
+pkill -x "mycap Dev"; while pgrep -x "mycap Dev" >/dev/null; do sleep 0.2; done
+open -g --env MYCAP_SAVE_DIR=$S/save "/Applications/mycap Dev.app"
+B=(open -n -g "/Applications/mycap Dev.app" --args)
+"${B[@]}" --ingest $S/fx/wide.png --ingest $S/fx/tall.png --ingest $S/fx/tiny.png --ingest $S/fx/strip.png
+"${B[@]}" --dump-thumbs          # hook.thumbs に最新が先頭で name / screen / frame / hovered
+"${B[@]}" --hover --snapshot $S/thumb-hover.png --unhover   # ホバー時のボタンの見た目
+"${B[@]}" --full                 # 全画面（選択 UI が出ないのでフック可。許可が無ければトーストで止まる）
+"${B[@]}" --close-all
 ```
+
+- 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の右端 = visibleFrame.maxX − 16、下端 = visibleFrame.minY + 16 になる
+- 同じ秒に複数枚入れると `_2` `_3` が付く
+- `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
+- `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）
+- `--tcc`: 許可の状態をログに出すだけ
 
 ## 画面収録の許可（TCC）
 
