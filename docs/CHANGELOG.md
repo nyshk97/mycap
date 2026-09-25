@@ -44,6 +44,8 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-26
+
 ### ✨ Added
 - 範囲・ウィンドウの撮影（⌘⇧4。Space でウィンドウに切り替え）と、マウスのある画面の全画面の撮影（⌘⇧3）
 - 撮った画面の右下に積むサムネイル（最大 5 枚）。ホバーでコピー・保存（`~/Downloads`）・ピン留め・OCR・整形、ドラッグで持ち出し、Esc で閉じる
