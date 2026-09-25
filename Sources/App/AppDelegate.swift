@@ -73,7 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
             (HotKeyBindings.fullScreen, { [weak self] in self?.capture.captureFullScreen() }),
             (HotKeyBindings.ocr, { [weak self] in self?.capture.captureOCR() }),
-            (HotKeyBindings.record, { Log.write("hotkey.not_implemented record") }),
+            (HotKeyBindings.record, { [weak self] in self?.capture.toggleRecording() }),
         ]
         for (binding, handler) in pairs {
             let status = HotKeyCenter.shared.register(keyCode: binding.keyCode, modifiers: binding.modifiers, handler: handler)
@@ -163,6 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
     /// `--style <png> <out.png>`: 保存済みの整形の設定で書き出す（クリップボードには書かない）
     /// `--style-open <png>` / `--style-snapshot <png>` / `--style-close`: 整形パネル（`--style-open` はアクティブにしない）
+    /// `--record-display <秒>`: picker とカウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -209,6 +210,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--style-snapshot":
                 let path = arg() ?? "/tmp/mycap-style.png"
                 Log.write("hook.style_snapshot path=\(path) ok=\(capture.style.snapshot(to: path))")
+            case "--record-display":
+                if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
             case "--style-close":
                 capture.style.close()
             default:

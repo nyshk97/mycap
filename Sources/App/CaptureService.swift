@@ -5,11 +5,13 @@ final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
     let style = StylePanelController()
+    let recorder = Recorder()
 
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
         thumbnails.onStyle = { [weak self] url in self?.style.open(url) }
         style.onExported = { [weak self] url in self?.thumbnails.add(url: url, screen: .underMouse) }
+        recorder.onSaved = { [weak self] url, screen in self?.thumbnails.add(url: url, screen: screen) }
     }
     private let capturer = ScreenCapturer()
     private var fullScreenRunning = false
@@ -27,6 +29,12 @@ final class CaptureService {
             }
             finish(tmp: tmp, kind: "region", screen: .underMouse, copy: true)
         }
+    }
+
+    /// 録画の開始（対象を選ぶ）／カウントダウンのキャンセル／停止
+    func toggleRecording() {
+        if recorder.state == .idle, !ensurePermission() { return }
+        recorder.toggle()
     }
 
     /// 範囲を選んで文字を読む。画像は保存せず、サムネイルも出さない
@@ -63,9 +71,10 @@ final class CaptureService {
         }
     }
 
-    /// 検証フック `--ingest`: 既存の画像を撮影結果として同じ経路に流す。クリップボードには書かない
+    /// 検証フック `--ingest`: 既存の画像（または mp4）を撮影結果として同じ経路に流す。クリップボードには書かない
     func ingest(path: String) {
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).png")
+        let ext = URL(fileURLWithPath: path).pathExtension.lowercased() == "mp4" ? "mp4" : "png"
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).\(ext)")
         do {
             try FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: tmp)
         } catch {
@@ -80,18 +89,19 @@ final class CaptureService {
             Toast.shared.show("保存できませんでした: \(Env.saveDir.path)")
             return
         }
-        if copy { ImageClipboard.copy(saved) }
+        if copy, saved.pathExtension == "png" { ImageClipboard.copy(saved) }
         let px = NSImage(contentsOf: saved)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
         Log.write("capture.\(kind).saved path=\(saved.path) px=\(px) copied=\(copy)")
         thumbnails.add(url: saved, screen: screen)
     }
 
     private func save(_ tmp: URL) -> URL? {
+        let ext = tmp.pathExtension
         let fm = FileManager.default
         let dir = Env.saveDir
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            let name = FileNaming.uniqueName(stem: FileNaming.stem(for: Date()), ext: "png") {
+            let name = FileNaming.uniqueName(stem: FileNaming.stem(for: Date()), ext: ext) {
                 fm.fileExists(atPath: dir.appendingPathComponent($0).path)
             }
             let dest = dir.appendingPathComponent(name)

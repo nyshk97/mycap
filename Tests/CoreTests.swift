@@ -209,3 +209,27 @@ final class StyleRendererTests: XCTestCase {
         XCTAssertEqual(decoded, s)
     }
 }
+
+final class RecordingFormatTests: XCTestCase {
+    func testLogicalResolutionForDisplays() {
+        // Studio Display・内蔵 15" の論理解像度はそのまま（偶数）
+        XCTAssertTrue(RecordingFormat.outputSize(points: CGSize(width: 2560, height: 1440)) == (2560, 1440))
+        XCTAssertTrue(RecordingFormat.outputSize(points: CGSize(width: 1512, height: 982)) == (1512, 982))
+    }
+
+    func testOddWindowSizeRoundsDownToEven() {
+        XCTAssertTrue(RecordingFormat.outputSize(points: CGSize(width: 801, height: 603.5)) == (800, 602))
+    }
+
+    func testTooWideShrinksWithinH264Limit() {
+        let s = RecordingFormat.outputSize(points: CGSize(width: 6000, height: 1000))
+        XCTAssertLessThanOrEqual(s.width, 4096)
+        XCTAssertEqual(Double(s.width) / Double(s.height), 6.0, accuracy: 0.02)
+    }
+
+    func testElapsed() {
+        XCTAssertEqual(RecordingFormat.elapsed(7), "0:07")
+        XCTAssertEqual(RecordingFormat.elapsed(754), "12:34")
+        XCTAssertEqual(RecordingFormat.elapsed(3723), "1:02:03")
+    }
+}

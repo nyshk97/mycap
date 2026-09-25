@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 
 /// 撮影後のサムネイルの束。撮った画面の右下に最新を置き、古いものほど上へ積む。
 /// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（ファイルは残る）
@@ -26,10 +27,30 @@ final class ThumbnailController {
     var count: Int { items.count }
 
     func add(url: URL, screen: NSScreen) {
+        if url.pathExtension.lowercased() == "mp4" {
+            // 動画は先頭のフレームをサムネイルにする
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            generator.appliesPreferredTrackTransform = true
+            generator.generateCGImageAsynchronously(for: .zero) { [weak self] cg, _, error in
+                DispatchQueue.main.async {
+                    guard let cg else {
+                        Log.write("thumbnail.video_frame_failed path=\(url.path) error=\(String(describing: error))")
+                        return
+                    }
+                    self?.add(url: url, image: NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)),
+                              isVideo: true, screen: screen)
+                }
+            }
+            return
+        }
         guard let image = NSImage(contentsOf: url) else {
             Log.write("thumbnail.load_failed path=\(url.path)")
             return
         }
+        add(url: url, image: image, isVideo: false, screen: screen)
+    }
+
+    private func add(url: URL, image: NSImage, isVideo: Bool, screen: NSScreen) {
         let size = ThumbnailLayout.panelSize(for: image.size)
         var panel: ThumbnailPanel!
         let actions = ThumbnailView.Actions(
@@ -45,13 +66,13 @@ final class ThumbnailController {
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }
         )
-        panel = ThumbnailPanel(url: url, image: image, size: size, actions: actions)
+        panel = ThumbnailPanel(url: url, image: image, size: size, isVideo: isVideo, actions: actions)
         items.insert(Item(panel: panel, screenID: screen.displayID), at: 0)
         for old in items.suffix(ThumbnailLayout.overflow(count: items.count)) {
             close(old.panel, reason: "overflow")
         }
         relayout(animated: true, newest: panel)
-        Log.write("thumbnail.added name=\(url.lastPathComponent) screen=\(screen.displayID) count=\(items.count)")
+        Log.write("thumbnail.added name=\(url.lastPathComponent) video=\(isVideo) screen=\(screen.displayID) count=\(items.count)")
     }
 
     func close(_ panel: ThumbnailPanel, reason: String) {

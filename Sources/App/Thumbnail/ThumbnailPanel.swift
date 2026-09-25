@@ -6,9 +6,9 @@ final class ThumbnailPanel: NSPanel {
     let url: URL
     let thumbnailView: ThumbnailView
 
-    init(url: URL, image: NSImage, size: NSSize, actions: ThumbnailView.Actions) {
+    init(url: URL, image: NSImage, size: NSSize, isVideo: Bool, actions: ThumbnailView.Actions) {
         self.url = url
-        thumbnailView = ThumbnailView(frame: NSRect(origin: .zero, size: size), url: url, image: image, actions: actions)
+        thumbnailView = ThumbnailView(frame: NSRect(origin: .zero, size: size), url: url, image: image, isVideo: isVideo, actions: actions)
         super.init(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isOpaque = false
@@ -44,14 +44,17 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private let url: URL
     private let image: NSImage
     private let actions: Actions
+    /// 動画はコピー・ピン・OCR・整形を出さない（Finder で表示・削除・閉じる・ドラッグだけ）
+    private let isVideo: Bool
     private let overlay = NSView()
     private var mouseDownPoint: NSPoint?
     private var escToken: UInt32?
     private(set) var isHovered = false
 
-    init(frame: NSRect, url: URL, image: NSImage, actions: Actions) {
+    init(frame: NSRect, url: URL, image: NSImage, isVideo: Bool, actions: Actions) {
         self.url = url
         self.image = image
+        self.isVideo = isVideo
         self.actions = actions
         super.init(frame: frame)
         wantsLayer = true
@@ -74,6 +77,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
         overlay.isHidden = true
         addSubview(overlay)
         buildButtons()
+        if isVideo { addVideoBadge() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -88,12 +92,13 @@ final class ThumbnailView: NSView, NSDraggingSource {
         overlay.addSubview(close)
         overlay.addSubview(trash)
 
-        let row = NSStackView(views: [
+        let finder = Self.button("folder", tip: "Finder で表示") { [weak self] in self?.actions.revealInFinder() }
+        let row = NSStackView(views: isVideo ? [finder] : [
             Self.button("doc.on.doc", tip: "コピー") { [weak self] in self?.actions.copy() },
             Self.button("pin", tip: "ピン留め") { [weak self] in self?.actions.pin() },
             Self.button("text.viewfinder", tip: "OCR（文字をコピー）") { [weak self] in self?.actions.ocr() },
             Self.button("wand.and.stars", tip: "整形（背景と余白）") { [weak self] in self?.actions.style() },
-            Self.button("folder", tip: "Finder で表示") { [weak self] in self?.actions.revealInFinder() },
+            finder,
         ])
         row.orientation = .horizontal
         row.spacing = 8
@@ -103,6 +108,15 @@ final class ThumbnailView: NSView, NSDraggingSource {
             row.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
             row.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -8),
         ])
+    }
+
+    /// 動画だと分かる印（左下の再生マーク）
+    private func addVideoBadge() {
+        let badge = NSImageView(frame: NSRect(x: 8, y: 8, width: 22, height: 22))
+        badge.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "動画")?
+            .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
+        badge.contentTintColor = .white
+        addSubview(badge, positioned: .below, relativeTo: overlay)
     }
 
     private static func button(_ symbol: String, tip: String, action: @escaping () -> Void) -> NSButton {
