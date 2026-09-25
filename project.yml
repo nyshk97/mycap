@@ -72,7 +72,7 @@ targets:
         SUFeedURL: $(MYCAP_SU_FEED_URL)
         SUEnableAutomaticChecks: true
         # keychain の Sparkle 鍵（account "mycap"）と対。generate_keys --account mycap の出力を書く
-        SUPublicEDKey: __SPARKLE_PUBLIC_KEY_NOT_SET__
+        SUPublicEDKey: Xal3F2sjXCGemM1fMW0ifL5K22ec+oQZWrdY/Z42Vdg=
   mycapTests:
     type: bundle.unit-test
     platform: macOS
