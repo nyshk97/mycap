@@ -46,10 +46,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         ocr.target = self
         menu.addItem(ocr)
         menu.addItem(.separator())
-        let cover = NSMenuItem(title: "デスクトップアイコンを隠す", action: #selector(toggleCover(_:)), keyEquivalent: "")
-        cover.target = self
-        cover.state = app.capture.desktopCover.isOn ? .on : .off
-        menu.addItem(cover)
         let closeAll = NSMenuItem(title: "サムネイルを全部閉じる", action: #selector(closeThumbnails(_:)), keyEquivalent: "")
         closeAll.target = self
         closeAll.isEnabled = app.capture.thumbnails.count > 0
@@ -107,7 +103,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
     @objc private func closeThumbnails(_ sender: Any?) { app.capture.thumbnails.closeAll() }
     @objc private func closePins(_ sender: Any?) { app.capture.pins.closeAll() }
-    @objc private func toggleCover(_ sender: Any?) { app.capture.desktopCover.toggle() }
     @objc private func showAbout(_ sender: Any?) { app.showAbout() }
     #if !DEBUG
     @objc private func checkForUpdates(_ sender: Any?) { app.checkForUpdates() }

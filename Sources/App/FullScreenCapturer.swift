@@ -5,9 +5,9 @@ import UniformTypeIdentifiers
 
 /// 全画面（マウスのあるディスプレイ）を ScreenCaptureKit で撮る。
 /// `screencapture -D <n>` の番号と NSScreen の対応はマルチディスプレイで確かめにくいので、ディスプレイ ID で引ける SCK にした。
-/// mycap 自身のウィンドウ（サムネイル・トースト）は写さない。ただし `keep`（デスクトップアイコンを隠す壁紙カバー）は写す
+/// mycap 自身のウィンドウ（サムネイル・トースト）は写さない
 enum FullScreenCapturer {
-    static func capture(screen: NSScreen, keep: [Int] = [], completion: @escaping (URL?) -> Void) {
+    static func capture(screen: NSScreen, completion: @escaping (URL?) -> Void) {
         let id = screen.displayID
         func finish(_ url: URL?) { DispatchQueue.main.async { completion(url) } }
         SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
@@ -16,9 +16,7 @@ enum FullScreenCapturer {
                 return finish(nil)
             }
             let mine = content.applications.filter { $0.bundleIdentifier == Bundle.main.bundleIdentifier }
-            let keepIDs = Set(keep.map { CGWindowID($0) })
-            let excepting = content.windows.filter { keepIDs.contains($0.windowID) }
-            let filter = SCContentFilter(display: display, excludingApplications: mine, exceptingWindows: excepting)
+            let filter = SCContentFilter(display: display, excludingApplications: mine, exceptingWindows: [])
             let scale = CGFloat(filter.pointPixelScale)
             let config = SCStreamConfiguration()
             config.width = Int(filter.contentRect.width * scale)

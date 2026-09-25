@@ -6,7 +6,7 @@ import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController!
-    /// 単一インスタンスの判定を通った後で作る（フックを渡すだけの 2 個目のプロセスで、壁紙カバー等を作らないため）
+    /// 単一インスタンスの判定を通った後で作る（フックを渡すだけの 2 個目のプロセスで、サムネイルの監視等を作らないため）
     private(set) var capture: CaptureService!
     /// 登録に失敗したホットキーの表示名（メニューバーに出す）
     private(set) var failedHotKeys: [String] = []
@@ -160,10 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
     /// `--ocr <png>`: 文字を読んでログとトーストに出す（クリップボードには書かない）
-    /// `--pin <png>` / `--dump-pins` / `--close-pins`
+    /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
     /// `--style <png> <out.png>`: 保存済みの整形の設定で書き出す（クリップボードには書かない）
     /// `--style-open <png>` / `--style-snapshot <png>` / `--style-close`: 整形パネル（`--style-open` はアクティブにしない）
-    /// `--toggle-cover` / `--dump-cover`: デスクトップアイコン隠し（トグルはユーザーのデスクトップの見た目が変わる）: ピン留め（`--pin` はクリックしないので key にならない）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -212,10 +211,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.write("hook.style_snapshot path=\(path) ok=\(capture.style.snapshot(to: path))")
             case "--style-close":
                 capture.style.close()
-            case "--toggle-cover":
-                capture.desktopCover.toggle()
-            case "--dump-cover":
-                Log.write("hook.cover on=\(capture.desktopCover.isOn) windows=\(capture.desktopCover.windowNumbers)")
             default:
                 Log.write("hook.unknown \(cmd)")
             }
