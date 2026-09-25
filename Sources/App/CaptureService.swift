@@ -3,6 +3,7 @@ import AppKit
 /// 静止画の撮影から撮影後の処理（保存 → コピー → サムネイル）までの流れ
 final class CaptureService {
     let thumbnails = ThumbnailController()
+    let pins = PinController()
     private let capturer = ScreenCapturer()
     private var fullScreenRunning = false
 
@@ -18,6 +19,22 @@ final class CaptureService {
                 return
             }
             finish(tmp: tmp, kind: "region", screen: .underMouse, copy: true)
+        }
+    }
+
+    /// 範囲を選んで文字を読む。画像は保存せず、サムネイルも出さない
+    func captureOCR() {
+        guard ensurePermission() else { return }
+        thumbnails.setHidden(true)
+        capturer.capture(.interactive) { [weak self] tmp in
+            self?.thumbnails.setHidden(false)
+            guard let tmp else {
+                Log.write("capture.cancelled mode=ocr")
+                return
+            }
+            OCR.recognizeAndCopy(url: tmp, source: "hotkey") { _ in
+                try? FileManager.default.removeItem(at: tmp)
+            }
         }
     }
 

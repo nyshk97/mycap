@@ -42,11 +42,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let full = NSMenuItem(title: "全画面を撮る（\(HotKeyBindings.fullScreen.label)）", action: #selector(captureFullScreen(_:)), keyEquivalent: "")
         full.target = self
         menu.addItem(full)
+        let ocr = NSMenuItem(title: "文字を読む（OCR）（\(HotKeyBindings.ocr.label)）", action: #selector(captureOCR(_:)), keyEquivalent: "")
+        ocr.target = self
+        menu.addItem(ocr)
         menu.addItem(.separator())
         let closeAll = NSMenuItem(title: "サムネイルを全部閉じる", action: #selector(closeThumbnails(_:)), keyEquivalent: "")
         closeAll.target = self
         closeAll.isEnabled = app.capture.thumbnails.count > 0
         menu.addItem(closeAll)
+        let closePins = NSMenuItem(title: "ピンを全部閉じる", action: #selector(closePins(_:)), keyEquivalent: "")
+        closePins.target = self
+        closePins.isEnabled = app.capture.pins.count > 0
+        menu.addItem(closePins)
 
         var warnings: [String] = []
         if !app.failedHotKeys.isEmpty {
@@ -91,7 +98,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func captureFullScreen(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureFullScreen() }
     }
+    @objc private func captureOCR(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureOCR() }
+    }
     @objc private func closeThumbnails(_ sender: Any?) { app.capture.thumbnails.closeAll() }
+    @objc private func closePins(_ sender: Any?) { app.capture.pins.closeAll() }
     @objc private func showAbout(_ sender: Any?) { app.showAbout() }
     #if !DEBUG
     @objc private func checkForUpdates(_ sender: Any?) { app.checkForUpdates() }
