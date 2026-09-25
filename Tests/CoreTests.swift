@@ -137,3 +137,75 @@ final class PinLayoutTests: XCTestCase {
         XCTAssertEqual(f.width / f.height, 2560 / 1440, accuracy: 0.01)
     }
 }
+
+final class StyleRendererTests: XCTestCase {
+    /// 単色（赤）の画像を作る
+    private func solid(_ w: Int, _ h: Int) -> CGImage {
+        let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()!
+    }
+
+    /// (x, y) は左上原点。RGBA（premultiplied）を返す
+    private func pixel(_ image: CGImage, _ x: Int, _ y: Int) -> [UInt8] {
+        var buf = [UInt8](repeating: 0, count: 4)
+        let ctx = CGContext(data: &buf, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.draw(image, in: CGRect(x: -x, y: -(image.height - 1 - y), width: image.width, height: image.height))
+        return buf
+    }
+
+    func testOutputSizeAddsPaddingInPixels() {
+        var s = StyleSettings()
+        s.padding = 10
+        // Retina（scale 2）の 100×50px に 10pt の余白 → 両側 20px ずつ
+        XCTAssertEqual(StyleRenderer.outputSize(imagePixels: CGSize(width: 100, height: 50), scale: 2, settings: s),
+                       CGSize(width: 140, height: 90))
+    }
+
+    func testPlainBackgroundAtCornerAndImageAtCenter() {
+        var s = StyleSettings()
+        s.background = .plain
+        s.padding = 10
+        s.shadow = false
+        let out = StyleRenderer.render(solid(100, 50), scale: 2, settings: s)!
+        XCTAssertEqual(out.width, 140)
+        let corner = pixel(out, 0, 0)
+        XCTAssertEqual(corner[3], 255)
+        XCTAssertEqual(Int(corner[0]), 242, accuracy: 2) // 0.95 × 255
+        let center = pixel(out, 70, 45)
+        XCTAssertEqual(center, [255, 0, 0, 255])
+    }
+
+    func testTransparentBackgroundKeepsAlphaZeroAndRoundsCorners() {
+        var s = StyleSettings()
+        s.background = .transparent
+        s.padding = 0
+        s.cornerRadius = 10
+        s.shadow = false
+        let out = StyleRenderer.render(solid(100, 50), scale: 2, settings: s)!
+        // 余白 0 なので画像の角 = 出力の角。角丸（20px）で削れて透明
+        XCTAssertEqual(pixel(out, 0, 0)[3], 0)
+        // 角から離れた縁の中央は画像のまま
+        XCTAssertEqual(pixel(out, 50, 0), [255, 0, 0, 255])
+    }
+
+    func testGradientDiffersBetweenCorners() {
+        var s = StyleSettings()
+        s.background = .ocean
+        s.padding = 20
+        s.shadow = false
+        let out = StyleRenderer.render(solid(40, 40), scale: 1, settings: s)!
+        XCTAssertNotEqual(pixel(out, 0, 0), pixel(out, out.width - 1, out.height - 1))
+    }
+
+    func testSettingsRoundTripThroughJSON() throws {
+        var s = StyleSettings()
+        s.background = .dusk
+        s.padding = 80
+        let decoded = try JSONDecoder().decode(StyleSettings.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(decoded, s)
+    }
+}

@@ -4,6 +4,14 @@ import AppKit
 final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
+    let desktopCover = DesktopCover()
+    let style = StylePanelController()
+
+    init() {
+        thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
+        thumbnails.onStyle = { [weak self] url in self?.style.open(url) }
+        style.onExported = { [weak self] url in self?.thumbnails.add(url: url, screen: .underMouse) }
+    }
     private let capturer = ScreenCapturer()
     private var fullScreenRunning = false
 
@@ -44,7 +52,7 @@ final class CaptureService {
         fullScreenRunning = true
         let screen = NSScreen.underMouse
         Log.write("capture.started mode=full screen=\(screen.displayID)")
-        FullScreenCapturer.capture(screen: screen) { [weak self] tmp in
+        FullScreenCapturer.capture(screen: screen, keep: desktopCover.windowNumbers) { [weak self] tmp in
             guard let self else { return }
             fullScreenRunning = false
             ScreenCapturer.logPermission(when: "after_capture")

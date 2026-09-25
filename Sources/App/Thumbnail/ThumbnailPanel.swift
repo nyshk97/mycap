@@ -34,6 +34,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
         var revealInFinder: () -> Void
         var pin: () -> Void
         var ocr: () -> Void
+        var style: () -> Void
         var trash: () -> Void
         var close: () -> Void
         /// ドラッグで持ち出せたとき（ドロップ先が受け取ったとき）
@@ -91,6 +92,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
             Self.button("doc.on.doc", tip: "コピー") { [weak self] in self?.actions.copy() },
             Self.button("pin", tip: "ピン留め") { [weak self] in self?.actions.pin() },
             Self.button("text.viewfinder", tip: "OCR（文字をコピー）") { [weak self] in self?.actions.ocr() },
+            Self.button("wand.and.stars", tip: "整形（背景と余白）") { [weak self] in self?.actions.style() },
             Self.button("folder", tip: "Finder で表示") { [weak self] in self?.actions.revealInFinder() },
         ])
         row.orientation = .horizontal
