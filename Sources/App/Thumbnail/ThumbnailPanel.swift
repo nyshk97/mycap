@@ -6,9 +6,9 @@ final class ThumbnailPanel: NSPanel {
     let url: URL
     let thumbnailView: ThumbnailView
 
-    init(url: URL, image: NSImage, size: NSSize, actions: ThumbnailView.Actions) {
+    init(url: URL, image: NSImage, size: NSSize, isVideo: Bool, actions: ThumbnailView.Actions) {
         self.url = url
-        thumbnailView = ThumbnailView(frame: NSRect(origin: .zero, size: size), url: url, image: image, actions: actions)
+        thumbnailView = ThumbnailView(frame: NSRect(origin: .zero, size: size), url: url, image: image, isVideo: isVideo, actions: actions)
         super.init(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isOpaque = false
@@ -31,11 +31,13 @@ final class ThumbnailPanel: NSPanel {
 final class ThumbnailView: NSView, NSDraggingSource {
     struct Actions {
         var copy: () -> Void
-        var revealInFinder: () -> Void
+        /// ~/Downloads へ保存し、保存先を返す（失敗なら nil）
+        var save: () -> URL?
+        /// 保存したファイルを Finder で表示する
+        var revealInFinder: (URL) -> Void
         var pin: () -> Void
         var ocr: () -> Void
         var style: () -> Void
-        var trash: () -> Void
         var close: () -> Void
         /// ドラッグで持ち出せたとき（ドロップ先が受け取ったとき）
         var draggedOut: () -> Void
@@ -44,14 +46,20 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private let url: URL
     private let image: NSImage
     private let actions: Actions
+    /// 動画はコピー・ピン・OCR・整形を出さない（保存・閉じる・ドラッグだけ）
+    private let isVideo: Bool
     private let overlay = NSView()
     private var mouseDownPoint: NSPoint?
     private var escToken: UInt32?
     private(set) var isHovered = false
+    /// 「保存」を押して ~/Downloads に書いた先。保存後は保存ボタンが「Finder で表示」に変わる
+    private(set) var savedURL: URL?
+    private var saveButton: ActionButton?
 
-    init(frame: NSRect, url: URL, image: NSImage, actions: Actions) {
+    init(frame: NSRect, url: URL, image: NSImage, isVideo: Bool, actions: Actions) {
         self.url = url
         self.image = image
+        self.isVideo = isVideo
         self.actions = actions
         super.init(frame: frame)
         wantsLayer = true
@@ -74,26 +82,25 @@ final class ThumbnailView: NSView, NSDraggingSource {
         overlay.isHidden = true
         addSubview(overlay)
         buildButtons()
+        if isVideo { addVideoBadge() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     private func buildButtons() {
         let close = Self.button("xmark.circle.fill", tip: "閉じる（Esc）") { [weak self] in self?.actions.close() }
-        let trash = Self.button("trash", tip: "削除（ゴミ箱へ）") { [weak self] in self?.actions.trash() }
         close.frame.origin = NSPoint(x: 6, y: bounds.height - 30)
         close.autoresizingMask = [.maxXMargin, .minYMargin]
-        trash.frame.origin = NSPoint(x: bounds.width - 30, y: bounds.height - 30)
-        trash.autoresizingMask = [.minXMargin, .minYMargin]
         overlay.addSubview(close)
-        overlay.addSubview(trash)
 
-        let row = NSStackView(views: [
+        let save = Self.button("square.and.arrow.down", tip: "保存（~/Downloads）") { [weak self] in self?.pressSave() }
+        saveButton = save
+        let row = NSStackView(views: isVideo ? [save] : [
             Self.button("doc.on.doc", tip: "コピー") { [weak self] in self?.actions.copy() },
+            save,
             Self.button("pin", tip: "ピン留め") { [weak self] in self?.actions.pin() },
             Self.button("text.viewfinder", tip: "OCR（文字をコピー）") { [weak self] in self?.actions.ocr() },
             Self.button("wand.and.stars", tip: "整形（背景と余白）") { [weak self] in self?.actions.style() },
-            Self.button("folder", tip: "Finder で表示") { [weak self] in self?.actions.revealInFinder() },
         ])
         row.orientation = .horizontal
         row.spacing = 8
@@ -105,7 +112,29 @@ final class ThumbnailView: NSView, NSDraggingSource {
         ])
     }
 
-    private static func button(_ symbol: String, tip: String, action: @escaping () -> Void) -> NSButton {
+    /// 動画だと分かる印（左下の再生マーク）
+    private func addVideoBadge() {
+        let badge = NSImageView(frame: NSRect(x: 8, y: 8, width: 22, height: 22))
+        badge.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "動画")?
+            .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
+        badge.contentTintColor = .white
+        addSubview(badge, positioned: .below, relativeTo: overlay)
+    }
+
+    /// 未保存なら保存して、ボタンを「Finder で表示」に変える。保存済みなら Finder で表示する
+    func pressSave() {
+        if let savedURL {
+            actions.revealInFinder(savedURL)
+            return
+        }
+        guard let saved = actions.save() else { return }
+        savedURL = saved
+        saveButton?.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Finder で表示")?
+            .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))
+        saveButton?.toolTip = "Finder で表示（\(saved.lastPathComponent)）"
+    }
+
+    private static func button(_ symbol: String, tip: String, action: @escaping () -> Void) -> ActionButton {
         let b = ActionButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
         b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)?
             .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))

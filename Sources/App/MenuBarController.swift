@@ -4,6 +4,8 @@ import AppKit
 final class MenuBarController: NSObject, NSMenuDelegate {
     private unowned let app: AppDelegate
     private let statusItem: NSStatusItem
+    private var menu: NSMenu!
+    private var recordingTimer: Timer?
 
     init(app: AppDelegate) {
         self.app = app
@@ -13,10 +15,46 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
         statusItem.menu = menu
+        self.menu = menu
         rebuild(menu)
         refreshIcon()
+        app.capture.recorder.onStateChange = { [weak self] in self?.refreshRecording() }
         Log.write("menu.installed")
     }
+
+    /// 録画中はアイコンを赤い ● と経過時間に変え、クリックで停止する（メニューは出さない）
+    private func refreshRecording() {
+        let recorder = app.capture.recorder
+        if recorder.state == .recording {
+            statusItem.menu = nil
+            statusItem.length = NSStatusItem.variableLength
+            statusItem.button?.image = nil
+            statusItem.button?.target = self
+            statusItem.button?.action = #selector(stopRecording(_:))
+            updateElapsed()
+            if recordingTimer == nil {
+                recordingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateElapsed() }
+            }
+        } else {
+            recordingTimer?.invalidate()
+            recordingTimer = nil
+            statusItem.button?.attributedTitle = NSAttributedString(string: "")
+            statusItem.button?.action = nil
+            statusItem.length = NSStatusItem.squareLength
+            statusItem.menu = menu
+            refreshIcon()
+        }
+    }
+
+    private func updateElapsed() {
+        let seconds = app.capture.recorder.startedAt.map { Date().timeIntervalSince($0) } ?? 0
+        let title = NSMutableAttributedString(string: "● ", attributes: [.foregroundColor: NSColor.systemRed])
+        title.append(NSAttributedString(string: RecordingFormat.elapsed(seconds),
+                                        attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)]))
+        statusItem.button?.attributedTitle = title
+    }
+
+    @objc private func stopRecording(_ sender: Any?) { app.capture.recorder.stop(reason: "menu_bar") }
 
     /// ホットキーの登録失敗・CleanShot X の起動中は警告アイコンにする
     private func refreshIcon() {
@@ -42,6 +80,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let full = NSMenuItem(title: "全画面を撮る（\(HotKeyBindings.fullScreen.label)）", action: #selector(captureFullScreen(_:)), keyEquivalent: "")
         full.target = self
         menu.addItem(full)
+        let record = NSMenuItem(title: "録画を開始（\(HotKeyBindings.record.label)）", action: #selector(toggleRecording(_:)), keyEquivalent: "")
+        record.target = self
+        menu.addItem(record)
         let ocr = NSMenuItem(title: "文字を読む（OCR）（\(HotKeyBindings.ocr.label)）", action: #selector(captureOCR(_:)), keyEquivalent: "")
         ocr.target = self
         menu.addItem(ocr)
@@ -97,6 +138,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
     @objc private func captureFullScreen(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureFullScreen() }
+    }
+    @objc private func toggleRecording(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.toggleRecording() }
     }
     @objc private func captureOCR(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureOCR() }

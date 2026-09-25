@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if forwardToRunningInstance(args) { return }
         Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path)")
         ScreenCapturer.logPermission(when: "launch")
+        CaptureStore.purge()
         capture = CaptureService()
 
         registerHotKeys()
@@ -73,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
             (HotKeyBindings.fullScreen, { [weak self] in self?.capture.captureFullScreen() }),
             (HotKeyBindings.ocr, { [weak self] in self?.capture.captureOCR() }),
-            (HotKeyBindings.record, { Log.write("hotkey.not_implemented record") }),
+            (HotKeyBindings.record, { [weak self] in self?.capture.toggleRecording() }),
         ]
         for (binding, handler) in pairs {
             let status = HotKeyCenter.shared.register(keyCode: binding.keyCode, modifiers: binding.modifiers, handler: handler)
@@ -154,8 +155,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
     /// `--tcc`: 画面収録の許可の状態をログに出す
     /// `--ingest <png>`: 既存の画像を撮影結果として保存・サムネイルの経路に流す（クリップボードには書かない）
-    /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる。クリップボードには書かない）
+    /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる）
     /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
+    /// `--save-newest`: 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えてから）
     /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
@@ -163,6 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
     /// `--style <png> <out.png>`: 保存済みの整形の設定で書き出す（クリップボードには書かない）
     /// `--style-open <png>` / `--style-snapshot <png>` / `--style-close`: 整形パネル（`--style-open` はアクティブにしない）
+    /// `--record-display <秒>`: picker とカウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -175,9 +178,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--ingest":
                 if let path = arg() { capture.ingest(path: path) }
             case "--full":
-                capture.captureFullScreen(copy: false)
+                capture.captureFullScreen()
             case "--dump-thumbs":
                 Log.write("hook.thumbs count=\(capture.thumbnails.count) items=\(capture.thumbnails.dump())")
+            case "--save-newest":
+                capture.thumbnails.saveNewest()
             case "--hover":
                 capture.thumbnails.hoverNewest(true)
             case "--unhover":
@@ -209,6 +214,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--style-snapshot":
                 let path = arg() ?? "/tmp/mycap-style.png"
                 Log.write("hook.style_snapshot path=\(path) ok=\(capture.style.snapshot(to: path))")
+            case "--record-display":
+                if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
             case "--style-close":
                 capture.style.close()
             default:
