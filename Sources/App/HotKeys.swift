@@ -31,6 +31,11 @@ final class HotKeyCenter {
     /// 登録に失敗したら OSStatus を返す（他のアプリが同じ組み合わせを取っている等）
     @discardableResult
     func register(keyCode: Int, modifiers: Int, handler: @escaping () -> Void) -> OSStatus {
+        registerToken(keyCode: keyCode, modifiers: modifiers, handler: handler).status
+    }
+
+    /// 一時的に取るキー（サムネイルにマウスが乗っている間の Esc 等）用。成功したら `unregister` に渡す id を返す
+    func registerToken(keyCode: Int, modifiers: Int, handler: @escaping () -> Void) -> (status: OSStatus, id: UInt32?) {
         installHandlerIfNeeded()
         let id = nextID
         nextID += 1
@@ -41,8 +46,16 @@ final class HotKeyCenter {
         if status == noErr, let ref {
             refs[id] = ref
             handlers[id] = handler
+            return (status, id)
         }
-        return status
+        return (status, nil)
+    }
+
+    func unregister(_ id: UInt32) {
+        if let ref = refs.removeValue(forKey: id) {
+            UnregisterEventHotKey(ref)
+        }
+        handlers[id] = nil
     }
 }
 

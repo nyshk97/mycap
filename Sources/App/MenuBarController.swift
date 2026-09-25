@@ -39,6 +39,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let region = NSMenuItem(title: "範囲／ウィンドウを撮る（\(HotKeyBindings.region.label)）", action: #selector(captureRegion(_:)), keyEquivalent: "")
         region.target = self
         menu.addItem(region)
+        let full = NSMenuItem(title: "全画面を撮る（\(HotKeyBindings.fullScreen.label)）", action: #selector(captureFullScreen(_:)), keyEquivalent: "")
+        full.target = self
+        menu.addItem(full)
+        menu.addItem(.separator())
+        let closeAll = NSMenuItem(title: "サムネイルを全部閉じる", action: #selector(closeThumbnails(_:)), keyEquivalent: "")
+        closeAll.target = self
+        closeAll.isEnabled = app.capture.thumbnails.count > 0
+        menu.addItem(closeAll)
 
         var warnings: [String] = []
         if !app.failedHotKeys.isEmpty {
@@ -76,7 +84,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(quit)
     }
 
-    @objc private func captureRegion(_ sender: Any?) { app.captureRegion() }
+    /// メニューが閉じ切る前に screencapture を起動すると、選択 UI がメニューの後ろに回ることがあるので 1 拍おく
+    @objc private func captureRegion(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureRegion() }
+    }
+    @objc private func captureFullScreen(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureFullScreen() }
+    }
+    @objc private func closeThumbnails(_ sender: Any?) { app.capture.thumbnails.closeAll() }
     @objc private func showAbout(_ sender: Any?) { app.showAbout() }
     #if !DEBUG
     @objc private func checkForUpdates(_ sender: Any?) { app.checkForUpdates() }
