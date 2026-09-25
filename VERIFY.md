@@ -36,7 +36,7 @@ tail -3 ~/Library/Logs/mycap/mycap-dev.log   # launch.forward_to_running と tcc
 ## 画面収録の許可（TCC）
 
 - 許可の状態は `tcc.preflight` の行で見る。起動時・撮影の前後に必ず出る
-- **ad-hoc 署名（署名 xcconfig が無いときのセッションのビルド）はリビルドごとに許可が外れる**。許可が続くかを見るのは `mise run signing` 後のビルドで
+- **Claude Code のセッションからのビルドは常に ad-hoc**（`CLAUDECODE` を見て `CODE_SIGN_IDENTITY=-` を渡す）で、リビルドごとに許可が外れる。許可が続くかを見るのは、ユーザーが自分の Terminal で `mise run signing` → `mise run run` したビルドで
 - 許可が署名で安定しているかは、2 回のビルドで designated requirement が一致するかで見る:
   `codesign -dr - "/Applications/mycap Dev.app"`（ハッシュ直指定でなく、証明書の identifier と Team で書かれていれば安定）
 - 許可を付け直すときは `tccutil reset ScreenCapture io.github.nyshk97.mycap.dev`

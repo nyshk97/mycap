@@ -11,7 +11,9 @@ description = "Debug（mycap Dev）をビルドする"
 run = """
 set -eo pipefail
 mise run gen
-xcodebuild -project mycap.xcodeproj -scheme mycap -configuration Debug -derivedDataPath build build > build/xcodebuild-debug.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-debug.log | head -40; exit 1; }
+# Claude Code のセッション（CLAUDECODE）からは証明書で署名しない（会社貸与 PC で keychain に触らない）。コマンドライン指定は xcconfig より優先される
+SESSION_SIGN=""; [ -n "${CLAUDECODE:-}" ] && SESSION_SIGN="CODE_SIGN_IDENTITY=-"
+xcodebuild -project mycap.xcodeproj -scheme mycap -configuration Debug -derivedDataPath build $SESSION_SIGN build > build/xcodebuild-debug.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-debug.log | head -40; exit 1; }
 grep -E '\\*\\* BUILD' build/xcodebuild-debug.log
 """
 
@@ -20,7 +22,9 @@ description = "Release（mycap）をビルドする"
 run = """
 set -eo pipefail
 mise run gen
-xcodebuild -project mycap.xcodeproj -scheme mycap -configuration Release -derivedDataPath build build > build/xcodebuild-release.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-release.log | head -40; exit 1; }
+# Claude Code のセッション（CLAUDECODE）からは証明書で署名しない（会社貸与 PC で keychain に触らない）。コマンドライン指定は xcconfig より優先される
+SESSION_SIGN=""; [ -n "${CLAUDECODE:-}" ] && SESSION_SIGN="CODE_SIGN_IDENTITY=-"
+xcodebuild -project mycap.xcodeproj -scheme mycap -configuration Release -derivedDataPath build $SESSION_SIGN build > build/xcodebuild-release.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-release.log | head -40; exit 1; }
 grep -E '\\*\\* BUILD' build/xcodebuild-release.log
 """
 
@@ -29,7 +33,9 @@ description = "単体テスト（Sources/Core の純粋関数）を実行する"
 run = """
 set -eo pipefail
 mise run gen
-xcodebuild -project mycap.xcodeproj -scheme mycap -derivedDataPath build test > build/xcodebuild-test.log 2>&1 || { grep -E 'error:|failed|\\*\\* TEST' build/xcodebuild-test.log | head -60; exit 1; }
+# Claude Code のセッション（CLAUDECODE）からは証明書で署名しない（会社貸与 PC で keychain に触らない）。コマンドライン指定は xcconfig より優先される
+SESSION_SIGN=""; [ -n "${CLAUDECODE:-}" ] && SESSION_SIGN="CODE_SIGN_IDENTITY=-"
+xcodebuild -project mycap.xcodeproj -scheme mycap -derivedDataPath build $SESSION_SIGN test > build/xcodebuild-test.log 2>&1 || { grep -E 'error:|failed|\\*\\* TEST' build/xcodebuild-test.log | head -60; exit 1; }
 grep -E 'Executed|\\*\\* TEST' build/xcodebuild-test.log | tail -3
 """
 

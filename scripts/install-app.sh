@@ -41,3 +41,6 @@ for _ in $(seq 1 50); do
 done
 [ -n "${pid:-}" ] || { echo "NG: $NAME が起動しない" >&2; exit 1; }
 echo "OK: $DEST を起動した（pid ${pid}）"
+if [ -n "${CLAUDECODE:-}" ]; then
+  echo "注意: Claude Code のセッションのビルドは ad-hoc 署名なので、画面収録の許可が外れる。許可が要る確認はユーザーの Terminal で mise run run する" >&2
+fi
