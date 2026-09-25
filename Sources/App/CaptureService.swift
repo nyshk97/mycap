@@ -1,6 +1,6 @@
 import AppKit
 
-/// 静止画の撮影から撮影後の処理（保存 → サムネイル）までの流れ
+/// 静止画の撮影から撮影後の処理（キャッシュに置く → サムネイル）までの流れ
 final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
@@ -84,33 +84,15 @@ final class CaptureService {
         finish(tmp: tmp, kind: "ingest", screen: .underMouse)
     }
 
-    /// 保存してサムネイルを出す。クリップボードには自動で載せない（ユーザー判断。コピーはサムネイルのボタンから）
+    /// キャッシュに置いてサムネイルを出す。保存・コピーはサムネイルのボタンを押したときだけ（ユーザー判断）
     private func finish(tmp: URL, kind: String, screen: NSScreen) {
-        guard let saved = save(tmp) else {
-            Toast.shared.show("保存できませんでした: \(Env.saveDir.path)")
+        guard let kept = CaptureStore.keep(tmp) else {
+            Toast.shared.show("撮った画像を置けませんでした: \(Env.cacheDir.path)")
             return
         }
-        let px = NSImage(contentsOf: saved)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
-        Log.write("capture.\(kind).saved path=\(saved.path) px=\(px)")
-        thumbnails.add(url: saved, screen: screen)
-    }
-
-    private func save(_ tmp: URL) -> URL? {
-        let ext = tmp.pathExtension
-        let fm = FileManager.default
-        let dir = Env.saveDir
-        do {
-            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            let name = FileNaming.uniqueName(stem: FileNaming.stem(for: Date()), ext: ext) {
-                fm.fileExists(atPath: dir.appendingPathComponent($0).path)
-            }
-            let dest = dir.appendingPathComponent(name)
-            try fm.moveItem(at: tmp, to: dest)
-            return dest
-        } catch {
-            Log.write("capture.save_failed error=\(error)")
-            return nil
-        }
+        let px = NSImage(contentsOf: kept)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
+        Log.write("capture.\(kind).captured path=\(kept.path) px=\(px)")
+        thumbnails.add(url: kept, screen: screen)
     }
 
     /// 許可が無いときの `screencapture -i` は Esc と区別の付かない終わり方をするので、撮る前に止めて知らせる

@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if forwardToRunningInstance(args) { return }
         Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path)")
         ScreenCapturer.logPermission(when: "launch")
+        CaptureStore.purge()
         capture = CaptureService()
 
         registerHotKeys()
@@ -156,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--ingest <png>`: 既存の画像を撮影結果として保存・サムネイルの経路に流す（クリップボードには書かない）
     /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる）
     /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
+    /// `--save-newest`: 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えてから）
     /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
@@ -179,6 +181,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 capture.captureFullScreen()
             case "--dump-thumbs":
                 Log.write("hook.thumbs count=\(capture.thumbnails.count) items=\(capture.thumbnails.dump())")
+            case "--save-newest":
+                capture.thumbnails.saveNewest()
             case "--hover":
                 capture.thumbnails.hoverNewest(true)
             case "--unhover":

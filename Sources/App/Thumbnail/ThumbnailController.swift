@@ -2,7 +2,7 @@ import AppKit
 import AVFoundation
 
 /// 撮影後のサムネイルの束。撮った画面の右下に最新を置き、古いものほど上へ積む。
-/// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（ファイルは残る）
+/// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（キャッシュのファイルは 24 時間残る）
 final class ThumbnailController {
     private struct Item {
         let panel: ThumbnailPanel
@@ -54,15 +54,26 @@ final class ThumbnailController {
         let size = ThumbnailLayout.panelSize(for: image.size)
         var panel: ThumbnailPanel!
         let actions = ThumbnailView.Actions(
-            copy: { ImageClipboard.copy(url) },
-            revealInFinder: { NSWorkspace.shared.activateFileViewerSelecting([url]) },
+            copy: {
+                ImageClipboard.copy(url)
+                Toast.shared.show("コピーしました")
+            },
+            save: {
+                guard let saved = CaptureStore.save(url) else {
+                    Toast.shared.show("保存できませんでした: \(Env.saveDir.path)")
+                    return nil
+                }
+                Log.write("thumbnail.saved name=\(saved.lastPathComponent) dir=\(saved.deletingLastPathComponent().path)")
+                Toast.shared.show("保存しました: \(saved.lastPathComponent)")
+                return saved
+            },
+            revealInFinder: { saved in NSWorkspace.shared.activateFileViewerSelecting([saved]) },
             pin: { [weak self] in
                 self?.onPin?(url)
                 self?.close(panel, reason: "pinned")
             },
             ocr: { OCR.recognizeAndCopy(url: url, source: "thumbnail") },
             style: { [weak self] in self?.onStyle?(url) },
-            trash: { [weak self] in self?.trash(panel) },
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }
         )
@@ -102,13 +113,6 @@ final class ThumbnailController {
         }
     }
 
-    private func trash(_ panel: ThumbnailPanel) {
-        NSWorkspace.shared.recycle([panel.url]) { _, error in
-            Log.write("thumbnail.trashed name=\(panel.url.lastPathComponent) error=\(String(describing: error))")
-        }
-        close(panel, reason: "trashed")
-    }
-
     /// つないでいた画面が外れたら、そこにあったサムネイルをマウスのある画面へ移す
     private func screensChanged() {
         let alive = Set(NSScreen.screens.map(\.displayID))
@@ -142,7 +146,12 @@ final class ThumbnailController {
 
     /// 最新が先頭。`name screen frame hovered` を返す
     func dump() -> [String] {
-        items.map { "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\($0.panel.thumbnailView.isHovered)" }
+        items.map { "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\($0.panel.thumbnailView.isHovered) saved=\($0.panel.thumbnailView.savedURL?.lastPathComponent ?? "-")" }
+    }
+
+    /// 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えて使う）
+    func saveNewest() {
+        items.first?.panel.thumbnailView.pressSave()
     }
 
     func hoverNewest(_ on: Bool) {

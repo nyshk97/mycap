@@ -21,8 +21,8 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 ログは `~/Library/Logs/mycap/mycap-dev.log`（常用版は `mycap.log`）。先頭の語がイベント名:
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
-`capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.saved` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|trashed|overflow|pinned` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown` /
+`capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|pinned` / `thumbnail.saved` / `cache.purged removed= kept=` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=esc|double_click|menu` / `pin.closed` / `pin.opacity` /
 `style.opened` / `style.exported px= bg= padding= corner= shadow=` / `style.render_failed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
@@ -30,7 +30,8 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
 
 常駐中の dev に引数を渡す（2 個目のプロセスは引数を既存インスタンスへ転送して終了する）。
-**保存先は `MYCAP_SAVE_DIR` で差し替えて起動し直してから撃つ**（`~/Downloads` を汚さない）。フックはクリップボードに書かない。
+撮ったものはキャッシュ（`~/Library/Caches/mycap-dev/`）に置かれ、サムネイルの「保存」で初めて保存先に書く。**保存先は `MYCAP_SAVE_DIR` で差し替えて起動し直してから撃つ**（`~/Downloads` を汚さない）。フックはクリップボードに書かない。
+キャッシュの掃除（24 時間）は、`touch -t` で古くしたファイルをキャッシュに置いて起動し直すと `cache.purged removed=1` になる。
 
 ```bash
 S=<scratchpad>; mkdir -p $S/save $S/fx
@@ -42,7 +43,8 @@ pkill -x "mycap Dev"; while pgrep -x "mycap Dev" >/dev/null; do sleep 0.2; done
 open -g --env MYCAP_SAVE_DIR=$S/save "/Applications/mycap Dev.app"
 B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --ingest $S/fx/wide.png --ingest $S/fx/tall.png --ingest $S/fx/tiny.png --ingest $S/fx/strip.png
-"${B[@]}" --dump-thumbs          # hook.thumbs に最新が先頭で name / screen / frame / hovered
+"${B[@]}" --dump-thumbs          # hook.thumbs に最新が先頭で name / screen / frame / hovered / saved
+"${B[@]}" --save-newest          # 最新のサムネイルの「保存」を押す → $S/save にできる（2 回押すと Finder が開くので 1 回だけ）
 "${B[@]}" --hover --snapshot $S/thumb-hover.png --unhover   # ホバー時のボタンの見た目
 "${B[@]}" --full                 # 全画面（選択 UI が出ないのでフック可。許可が無ければトーストで止まる）
 "${B[@]}" --close-all

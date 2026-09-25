@@ -12,7 +12,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
     private(set) var startedAt: Date?
     /// 状態が変わったとき（メニューバーの表示を切り替える）
     var onStateChange: (() -> Void)?
-    /// 保存できた mp4 を受け取る（サムネイルを出す）
+    /// 録れた mp4（キャッシュに置いたもの）を受け取る（サムネイルを出す）
     var onSaved: ((URL, NSScreen) -> Void)?
 
     private let countdown = Countdown()
@@ -227,11 +227,11 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
             Toast.shared.show("録画を保存できませんでした")
             return
         }
-        guard let saved = save(tmp) else {
-            Toast.shared.show("録画を保存できませんでした: \(Env.saveDir.path)")
+        guard let saved = CaptureStore.keep(tmp) else {
+            Toast.shared.show("録画を置けませんでした: \(Env.cacheDir.path)")
             return
         }
-        Log.write("record.saved path=\(saved.path) seconds=\(String(format: "%.1f", duration)) reason=\(reason)")
+        Log.write("record.captured path=\(saved.path) seconds=\(String(format: "%.1f", duration)) reason=\(reason)")
         if reason == "stream_stopped" { Toast.shared.show("録画が途中で止まりました。そこまでを保存しました") }
         onSaved?(saved, screen)
     }
@@ -241,22 +241,5 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         output = nil
         tmpURL = nil
         startedAt = nil
-    }
-
-    private func save(_ tmp: URL) -> URL? {
-        let fm = FileManager.default
-        let dir = Env.saveDir
-        do {
-            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-            let name = FileNaming.uniqueName(stem: FileNaming.stem(for: Date()), ext: "mp4") {
-                fm.fileExists(atPath: dir.appendingPathComponent($0).path)
-            }
-            let dest = dir.appendingPathComponent(name)
-            try fm.moveItem(at: tmp, to: dest)
-            return dest
-        } catch {
-            Log.write("record.save_failed error=\(error)")
-            return nil
-        }
     }
 }

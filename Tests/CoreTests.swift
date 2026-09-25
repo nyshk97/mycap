@@ -233,3 +233,16 @@ final class RecordingFormatTests: XCTestCase {
         XCTAssertEqual(RecordingFormat.elapsed(3723), "1:02:03")
     }
 }
+
+final class CacheRetentionTests: XCTestCase {
+    func testOnlyOlderThanADayExpire() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let files: [(name: String, modified: Date)] = [
+            ("fresh.png", now.addingTimeInterval(-60)),
+            ("just-under.png", now.addingTimeInterval(-CacheRetention.maxAge + 1)),
+            ("old.png", now.addingTimeInterval(-CacheRetention.maxAge - 1)),
+            ("older.mp4", now.addingTimeInterval(-3 * CacheRetention.maxAge)),
+        ]
+        XCTAssertEqual(CacheRetention.expired(files, now: now), ["old.png", "older.mp4"])
+    }
+}
