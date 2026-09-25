@@ -1,0 +1,5 @@
+*.xcodeproj
+*.local.xcconfig
+build/
+dist/
+.DS_Store
