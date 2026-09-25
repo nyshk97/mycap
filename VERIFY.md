@@ -47,8 +47,8 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --close-all
 # OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
-# ピン（マウスのある画面の中央に実寸。--zoom-pin は中心を固定して倍率を掛ける。上限 4 倍・下限 0.1 倍）
-"${B[@]}" --pin "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-pins --zoom-pin 2 --dump-pins --close-pins
+# ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）
+"${B[@]}" --pin "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-pins --close-pins
 ```
 
 - 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の右端 = visibleFrame.maxX − 16、下端 = visibleFrame.minY + 16 になる

@@ -159,7 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
     /// `--ocr <png>`: 文字を読んでログとトーストに出す（クリップボードには書かない）
-    /// `--pin <png>` / `--zoom-pin <倍率>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
+    /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -192,8 +192,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case "--pin":
                 if let path = arg() { capture.pins.pin(url: URL(fileURLWithPath: path)) }
-            case "--zoom-pin":
-                if let f = arg().flatMap(Double.init) { capture.pins.zoomNewest(CGFloat(f)) }
             case "--dump-pins":
                 Log.write("hook.pins count=\(capture.pins.count) items=\(capture.pins.dump())")
             case "--close-pins":

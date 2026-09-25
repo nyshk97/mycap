@@ -1,7 +1,7 @@
 import AppKit
 
 /// 最前面に浮かぶ画像 1 枚。全 Space・フルスクリーンの上にも出る。
-/// クリックで key になり（アプリはアクティブにしない）、⌘C でコピー・Esc で閉じる
+/// クリックで key になり（アプリはアクティブにしない）、⌘C でコピー・Esc で閉じる。縁と角のドラッグで拡大縮小する
 final class PinPanel: NSPanel {
     let url: URL
     private let image: NSImage
@@ -11,7 +11,11 @@ final class PinPanel: NSPanel {
         self.url = url
         self.image = image
         self.onClose = onClose
-        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        // 縁と角をつかんでリサイズする（OS 標準の矢印カーソルが出る）。縦横比は固定、実寸の 0.1〜4 倍
+        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel, .resizable], backing: .buffered, defer: false)
+        contentAspectRatio = image.size
+        contentMinSize = NSSize(width: image.size.width * PinLayout.minScale, height: image.size.height * PinLayout.minScale)
+        contentMaxSize = NSSize(width: image.size.width * PinLayout.maxScale, height: image.size.height * PinLayout.maxScale)
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
@@ -34,10 +38,6 @@ final class PinPanel: NSPanel {
     }
 
     func copyImage() { ImageClipboard.copy(url) }
-
-    func zoom(by factor: CGFloat, anchor: NSPoint) {
-        setFrame(PinLayout.scaled(frame: frame, image: image.size, by: factor, anchor: anchor), display: true)
-    }
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { // Esc
@@ -88,17 +88,6 @@ private final class PinView: NSView {
         } else {
             panel.performDrag(with: event)
         }
-    }
-
-    override func scrollWheel(with event: NSEvent) {
-        guard let panel else { return }
-        let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY / 200 : event.scrollingDeltaY / 10
-        guard delta != 0 else { return }
-        panel.zoom(by: 1 + delta, anchor: NSEvent.mouseLocation)
-    }
-
-    override func magnify(with event: NSEvent) {
-        panel?.zoom(by: 1 + event.magnification, anchor: NSEvent.mouseLocation)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

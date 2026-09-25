@@ -38,10 +38,4 @@ final class PinController {
     func dump() -> [String] {
         panels.map { "\($0.url.lastPathComponent) frame=\(NSStringFromRect($0.frame)) alpha=\($0.alphaValue)" }
     }
-
-    /// 最新のピンを `factor` 倍にする（スクロール・ピンチと同じ計算。中心を固定）
-    func zoomNewest(_ factor: CGFloat) {
-        guard let p = panels.last else { return }
-        p.zoom(by: factor, anchor: NSPoint(x: p.frame.midX, y: p.frame.midY))
-    }
 }

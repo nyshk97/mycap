@@ -136,15 +136,4 @@ final class PinLayoutTests: XCTestCase {
         XCTAssertTrue(builtIn.contains(f), "\(f)")
         XCTAssertEqual(f.width / f.height, 2560 / 1440, accuracy: 0.01)
     }
-
-    func testScaleKeepsAnchorAndClamps() {
-        let image = CGSize(width: 400, height: 300)
-        let frame = CGRect(x: 100, y: 100, width: 400, height: 300)
-        let anchor = CGPoint(x: 100, y: 100) // 左下の角を掴んだまま拡大
-        let bigger = PinLayout.scaled(frame: frame, image: image, by: 2, anchor: anchor)
-        XCTAssertEqual(bigger, CGRect(x: 100, y: 100, width: 800, height: 600))
-        // 上限 4 倍・下限 0.1 倍で止まる
-        XCTAssertEqual(PinLayout.scaled(frame: frame, image: image, by: 100, anchor: anchor).width, 1600)
-        XCTAssertEqual(PinLayout.scaled(frame: frame, image: image, by: 0.001, anchor: anchor).width, 40)
-    }
 }
