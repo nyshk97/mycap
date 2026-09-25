@@ -38,6 +38,6 @@
 	<key>SUFeedURL</key>
 	<string>$(MYCAP_SU_FEED_URL)</string>
 	<key>SUPublicEDKey</key>
-	<string>__SPARKLE_PUBLIC_KEY_NOT_SET__</string>
+	<string>Xal3F2sjXCGemM1fMW0ifL5K22ec+oQZWrdY/Z42Vdg=</string>
 </dict>
 </plist>
