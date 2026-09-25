@@ -5,7 +5,7 @@
 ```bash
 mise run build          # Debug（mycap Dev）。署名 xcconfig が無ければ ad-hoc で通る
 mise run build-release  # Release（mycap）
-mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方）
+mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ）
 mise run run            # /Applications/mycap Dev.app に置いて起動し直す（旧プロセスの終了を待つ）
 ```
 
@@ -22,7 +22,8 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.saved` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|trashed|overflow` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|trashed|overflow|pinned` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown` /
+`ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=esc|double_click|menu` / `pin.closed` / `pin.opacity` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
@@ -44,6 +45,10 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --hover --snapshot $S/thumb-hover.png --unhover   # ホバー時のボタンの見た目
 "${B[@]}" --full                 # 全画面（選択 UI が出ないのでフック可。許可が無ければトーストで止まる）
 "${B[@]}" --close-all
+# OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
+"${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
+# ピン（マウスのある画面の中央に実寸。--zoom-pin は中心を固定して倍率を掛ける。上限 4 倍・下限 0.1 倍）
+"${B[@]}" --pin "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-pins --zoom-pin 2 --dump-pins --close-pins
 ```
 
 - 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の右端 = visibleFrame.maxX − 16、下端 = visibleFrame.minY + 16 になる

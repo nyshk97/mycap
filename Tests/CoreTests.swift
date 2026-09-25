@@ -85,3 +85,66 @@ final class ThumbnailLayoutTests: XCTestCase {
         XCTAssertEqual(ThumbnailLayout.overflow(count: 6), 1)
     }
 }
+
+final class OCRTextTests: XCTestCase {
+    private typealias F = OCRText.Fragment
+
+    func testLinesTopToBottomAndLeftToRight() {
+        // Vision の正規化座標は原点が左下（y が大きいほど上）。入力の順番はばらばらにしておく
+        let text = OCRText.assemble([
+            F("2 行目", CGRect(x: 0.1, y: 0.40, width: 0.3, height: 0.1)),
+            F("右", CGRect(x: 0.6, y: 0.71, width: 0.1, height: 0.08)),
+            F("左", CGRect(x: 0.1, y: 0.70, width: 0.1, height: 0.1)),
+        ])
+        XCTAssertEqual(text, "左右\n2 行目")
+    }
+
+    func testSpaceOnlyBetweenAsciiWords() {
+        XCTAssertEqual(OCRText.join(["Screen", "Recording"]), "Screen Recording")
+        XCTAssertEqual(OCRText.join(["画面", "収録"]), "画面収録")
+        XCTAssertEqual(OCRText.join(["macOS", "の設定"]), "macOSの設定")
+    }
+
+    func testSmallVerticalOverlapIsSeparateLine() {
+        // 高さの半分未満しか重ならない断片は別の行
+        let text = OCRText.assemble([
+            F("上", CGRect(x: 0.1, y: 0.50, width: 0.1, height: 0.1)),
+            F("下", CGRect(x: 0.1, y: 0.42, width: 0.1, height: 0.1)),
+        ])
+        XCTAssertEqual(text, "上\n下")
+    }
+
+    func testEmptyInput() {
+        XCTAssertEqual(OCRText.assemble([]), "")
+        XCTAssertEqual(OCRText.assemble([F("  ", CGRect(x: 0, y: 0, width: 1, height: 1))]), "")
+    }
+}
+
+final class PinLayoutTests: XCTestCase {
+    private let builtIn = CGRect(x: 0, y: 77, width: 1512, height: 872)
+
+    func testSmallImageIsActualSizeAndCentered() {
+        let f = PinLayout.initialFrame(image: CGSize(width: 400, height: 300), visible: builtIn)
+        XCTAssertEqual(f.size, CGSize(width: 400, height: 300))
+        XCTAssertEqual(f.midX, builtIn.midX, accuracy: 1)
+        XCTAssertEqual(f.midY, builtIn.midY, accuracy: 1)
+    }
+
+    func testLargeImageShrinksToFitScreen() {
+        // Studio Display の全画面（2560×1440pt）を内蔵にピン留めする
+        let f = PinLayout.initialFrame(image: CGSize(width: 2560, height: 1440), visible: builtIn)
+        XCTAssertTrue(builtIn.contains(f), "\(f)")
+        XCTAssertEqual(f.width / f.height, 2560 / 1440, accuracy: 0.01)
+    }
+
+    func testScaleKeepsAnchorAndClamps() {
+        let image = CGSize(width: 400, height: 300)
+        let frame = CGRect(x: 100, y: 100, width: 400, height: 300)
+        let anchor = CGPoint(x: 100, y: 100) // 左下の角を掴んだまま拡大
+        let bigger = PinLayout.scaled(frame: frame, image: image, by: 2, anchor: anchor)
+        XCTAssertEqual(bigger, CGRect(x: 100, y: 100, width: 800, height: 600))
+        // 上限 4 倍・下限 0.1 倍で止まる
+        XCTAssertEqual(PinLayout.scaled(frame: frame, image: image, by: 100, anchor: anchor).width, 1600)
+        XCTAssertEqual(PinLayout.scaled(frame: frame, image: image, by: 0.001, anchor: anchor).width, 40)
+    }
+}

@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path)")
         ScreenCapturer.logPermission(when: "launch")
 
+        capture.thumbnails.onPin = { [weak self] url in self?.capture.pins.pin(url: url) }
         registerHotKeys()
         menuBar = MenuBarController(app: self)
 
@@ -70,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pairs: [(HotKeyBindings.Binding, () -> Void)] = [
             (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
             (HotKeyBindings.fullScreen, { [weak self] in self?.capture.captureFullScreen() }),
-            (HotKeyBindings.ocr, { Log.write("hotkey.not_implemented ocr") }),
+            (HotKeyBindings.ocr, { [weak self] in self?.capture.captureOCR() }),
             (HotKeyBindings.record, { Log.write("hotkey.not_implemented record") }),
         ]
         for (binding, handler) in pairs {
@@ -157,6 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
+    /// `--ocr <png>`: 文字を読んでログとトーストに出す（クリップボードには書かない）
+    /// `--pin <png>` / `--zoom-pin <倍率>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -181,6 +184,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.write("hook.snapshot path=\(path) ok=\(capture.thumbnails.snapshotNewest(to: path))")
             case "--close-all":
                 capture.thumbnails.closeAll()
+            case "--ocr":
+                if let path = arg() {
+                    OCR.recognizeAndCopy(url: URL(fileURLWithPath: path), source: "hook", copy: false) { text in
+                        Log.write("hook.ocr text=\(text.replacingOccurrences(of: "\n", with: "⏎"))")
+                    }
+                }
+            case "--pin":
+                if let path = arg() { capture.pins.pin(url: URL(fileURLWithPath: path)) }
+            case "--zoom-pin":
+                if let f = arg().flatMap(Double.init) { capture.pins.zoomNewest(CGFloat(f)) }
+            case "--dump-pins":
+                Log.write("hook.pins count=\(capture.pins.count) items=\(capture.pins.dump())")
+            case "--close-pins":
+                capture.pins.closeAll()
             default:
                 Log.write("hook.unknown \(cmd)")
             }
