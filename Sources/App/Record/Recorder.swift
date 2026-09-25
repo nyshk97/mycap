@@ -74,17 +74,19 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         SCContentSharingPicker.shared.isActive = false
     }
 
+    /// picker で選んだフィルタは picker が与えたアクセス権にぶら下がるので、picker は録画が終わるまでアクティブのままにする
+    /// （選んだ直後に isActive = false にすると、ウィンドウの録画が「The stream is nil」で始まらなかった）
     private func picked(_ pickerFilter: SCContentFilter) {
         guard state == .picking else { return }
-        finishPicker()
         let isDisplay = pickerFilter.style == .display
         let displayID = pickerFilter.includedDisplays.first?.displayID
         targetScreen = displayID.flatMap(NSScreen.withID) ?? .underMouse
-        Log.write("record.picked style=\(isDisplay ? "display" : "window") rect=\(NSStringFromRect(pickerFilter.contentRect))")
+        Log.write("record.picked style=\(isDisplay ? "display" : "window") raw_style=\(pickerFilter.style.rawValue) displays=\(pickerFilter.includedDisplays.count) windows=\(pickerFilter.includedWindows.count) rect=\(NSStringFromRect(pickerFilter.contentRect))")
         state = .countdown
         countdown.start(seconds: 3, on: targetScreen, finish: { [weak self] in
             self?.begin(pickerFilter, isDisplay: isDisplay, displayID: displayID)
         }, cancel: { [weak self] in
+            self?.finishPicker()
             self?.state = .idle
         })
     }
@@ -140,6 +142,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
             try stream.addRecordingOutput(output)
         } catch {
             Log.write("record.add_output_failed error=\(error)")
+            finishPicker()
             state = .idle
             Toast.shared.show("録画を始められませんでした")
             return
@@ -152,6 +155,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
             DispatchQueue.main.async {
                 if let error {
                     Log.write("record.start_failed error=\(error)")
+                    self.finishPicker()
                     self.cleanup()
                     self.state = .idle
                     Toast.shared.show("録画を始められませんでした")
@@ -215,6 +219,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         let duration = startedAt.map { Date().timeIntervalSince($0) } ?? 0
         let reason = stopReason
         let screen = targetScreen
+        finishPicker()
         cleanup()
         state = .idle
         guard FileManager.default.fileExists(atPath: tmp.path) else {
