@@ -14,6 +14,8 @@ final class ThumbnailController {
 
     /// サムネイルの「ピン留め」から呼ぶ
     var onPin: ((URL) -> Void)?
+    /// サムネイルの「整形」から呼ぶ
+    var onStyle: ((URL) -> Void)?
 
     init() {
         NotificationCenter.default.addObserver(
@@ -38,6 +40,7 @@ final class ThumbnailController {
                 self?.close(panel, reason: "pinned")
             },
             ocr: { OCR.recognizeAndCopy(url: url, source: "thumbnail") },
+            style: { [weak self] in self?.onStyle?(url) },
             trash: { [weak self] in self?.trash(panel) },
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }

@@ -5,7 +5,7 @@ enum ThumbnailLayout {
     /// 画像を収める箱。内蔵 1 枚（visibleFrame の高さ 880pt 前後）でも 5 枚積めるように高さを抑える
     static let maxBox = CGSize(width: 240, height: 150)
     /// ホバーのボタンが並ぶ最小の大きさ。極端に横長・縦長の画像はこの枠の中に余白付きで収める
-    static let minPanel = CGSize(width: 150, height: 96)
+    static let minPanel = CGSize(width: 160, height: 96)
     static let margin: CGFloat = 16
     static let spacing: CGFloat = 12
     static let maxCount = 5

@@ -4,6 +4,13 @@ import AppKit
 final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
+    let style = StylePanelController()
+
+    init() {
+        thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
+        thumbnails.onStyle = { [weak self] url in self?.style.open(url) }
+        style.onExported = { [weak self] url in self?.thumbnails.add(url: url, screen: .underMouse) }
+    }
     private let capturer = ScreenCapturer()
     private var fullScreenRunning = false
 

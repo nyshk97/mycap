@@ -6,7 +6,8 @@ import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController!
-    let capture = CaptureService()
+    /// 単一インスタンスの判定を通った後で作る（フックを渡すだけの 2 個目のプロセスで、サムネイルの監視等を作らないため）
+    private(set) var capture: CaptureService!
     /// 登録に失敗したホットキーの表示名（メニューバーに出す）
     private(set) var failedHotKeys: [String] = []
 
@@ -24,8 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if forwardToRunningInstance(args) { return }
         Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path)")
         ScreenCapturer.logPermission(when: "launch")
+        capture = CaptureService()
 
-        capture.thumbnails.onPin = { [weak self] url in self?.capture.pins.pin(url: url) }
         registerHotKeys()
         menuBar = MenuBarController(app: self)
 
@@ -160,6 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--close-all`: サムネイルを全部閉じる
     /// `--ocr <png>`: 文字を読んでログとトーストに出す（クリップボードには書かない）
     /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
+    /// `--style <png> <out.png>`: 保存済みの整形の設定で書き出す（クリップボードには書かない）
+    /// `--style-open <png>` / `--style-snapshot <png>` / `--style-close`: 整形パネル（`--style-open` はアクティブにしない）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -196,6 +199,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.write("hook.pins count=\(capture.pins.count) items=\(capture.pins.dump())")
             case "--close-pins":
                 capture.pins.closeAll()
+            case "--style":
+                if let src = arg(), let out = arg() {
+                    let url = StyleService.export(URL(fileURLWithPath: src), settings: StyleService.settings, to: URL(fileURLWithPath: out))
+                    Log.write("hook.style ok=\(url != nil)")
+                }
+            case "--style-open":
+                if let src = arg() { capture.style.open(URL(fileURLWithPath: src), activate: false) }
+            case "--style-snapshot":
+                let path = arg() ?? "/tmp/mycap-style.png"
+                Log.write("hook.style_snapshot path=\(path) ok=\(capture.style.snapshot(to: path))")
+            case "--style-close":
+                capture.style.close()
             default:
                 Log.write("hook.unknown \(cmd)")
             }

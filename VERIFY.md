@@ -5,7 +5,7 @@
 ```bash
 mise run build          # Debug（mycap Dev）。署名 xcconfig が無ければ ad-hoc で通る
 mise run build-release  # Release（mycap）
-mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ）
+mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ・整形の描画の画素）
 mise run run            # /Applications/mycap Dev.app に置いて起動し直す（旧プロセスの終了を待つ）
 ```
 
@@ -24,6 +24,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.saved` / `capture.skipped` / `capture.save_failed` /
 `clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|trashed|overflow|pinned` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=esc|double_click|menu` / `pin.closed` / `pin.opacity` /
+`style.opened` / `style.exported px= bg= padding= corner= shadow=` / `style.render_failed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
@@ -49,6 +50,9 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）
 "${B[@]}" --pin "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-pins --close-pins
+# 整形（保存済みの設定で書き出す。144dpi の 1800×720 に既定の余白 48pt → 1992×912）
+"${B[@]}" --style "$PWD/Tests/Fixtures/ocr-ja-en.png" $S/styled.png
+"${B[@]}" --style-open "$PWD/Tests/Fixtures/ocr-ja-en.png"; "${B[@]}" --style-snapshot $S/style-panel.png --style-close
 ```
 
 - 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の右端 = visibleFrame.maxX − 16、下端 = visibleFrame.minY + 16 になる
@@ -56,6 +60,8 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 - `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
 - `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）
 - `--tcc`: 許可の状態をログに出すだけ
+- `--style-snapshot` はプレビューと背景の丸ボタンしか写らない（スライダー・トグル・ボタンの文字はプロセス内描画に出ない）。コントロールの見た目は実機で見る
+- フックを渡すだけの 2 個目のプロセスは `launch.forward_to_running` の 1 行だけを出して終わる（`thumbnail.*` 等が出たら、単一インスタンスの判定より前に何かを作っている）
 
 ## 画面収録の許可（TCC）
 
