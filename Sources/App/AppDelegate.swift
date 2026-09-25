@@ -154,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
     /// `--tcc`: 画面収録の許可の状態をログに出す
     /// `--ingest <png>`: 既存の画像を撮影結果として保存・サムネイルの経路に流す（クリップボードには書かない）
-    /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる。クリップボードには書かない）
+    /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる）
     /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
     /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
@@ -176,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--ingest":
                 if let path = arg() { capture.ingest(path: path) }
             case "--full":
-                capture.captureFullScreen(copy: false)
+                capture.captureFullScreen()
             case "--dump-thumbs":
                 Log.write("hook.thumbs count=\(capture.thumbnails.count) items=\(capture.thumbnails.dump())")
             case "--hover":

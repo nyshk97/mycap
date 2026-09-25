@@ -1,6 +1,6 @@
 import AppKit
 
-/// 静止画の撮影から撮影後の処理（保存 → コピー → サムネイル）までの流れ
+/// 静止画の撮影から撮影後の処理（保存 → サムネイル）までの流れ
 final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
@@ -27,7 +27,7 @@ final class CaptureService {
                 Log.write("capture.cancelled mode=region")
                 return
             }
-            finish(tmp: tmp, kind: "region", screen: .underMouse, copy: true)
+            finish(tmp: tmp, kind: "region", screen: .underMouse)
         }
     }
 
@@ -53,8 +53,8 @@ final class CaptureService {
         }
     }
 
-    /// マウスのあるディスプレイ全体。`copy: false` は検証フック `--full` 用（クリップボードを上書きしない）
-    func captureFullScreen(copy: Bool = true) {
+    /// マウスのあるディスプレイ全体
+    func captureFullScreen() {
         guard ensurePermission(), !fullScreenRunning else { return }
         fullScreenRunning = true
         let screen = NSScreen.underMouse
@@ -67,11 +67,11 @@ final class CaptureService {
                 Toast.shared.show("全画面を撮れませんでした")
                 return
             }
-            finish(tmp: tmp, kind: "full", screen: screen, copy: copy)
+            finish(tmp: tmp, kind: "full", screen: screen)
         }
     }
 
-    /// 検証フック `--ingest`: 既存の画像（または mp4）を撮影結果として同じ経路に流す。クリップボードには書かない
+    /// 検証フック `--ingest`: 既存の画像（または mp4）を撮影結果として同じ経路に流す
     func ingest(path: String) {
         let ext = URL(fileURLWithPath: path).pathExtension.lowercased() == "mp4" ? "mp4" : "png"
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).\(ext)")
@@ -81,17 +81,17 @@ final class CaptureService {
             Log.write("hook.ingest_failed path=\(path) error=\(error)")
             return
         }
-        finish(tmp: tmp, kind: "ingest", screen: .underMouse, copy: false)
+        finish(tmp: tmp, kind: "ingest", screen: .underMouse)
     }
 
-    private func finish(tmp: URL, kind: String, screen: NSScreen, copy: Bool) {
+    /// 保存してサムネイルを出す。クリップボードには自動で載せない（ユーザー判断。コピーはサムネイルのボタンから）
+    private func finish(tmp: URL, kind: String, screen: NSScreen) {
         guard let saved = save(tmp) else {
             Toast.shared.show("保存できませんでした: \(Env.saveDir.path)")
             return
         }
-        if copy, saved.pathExtension == "png" { ImageClipboard.copy(saved) }
         let px = NSImage(contentsOf: saved)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
-        Log.write("capture.\(kind).saved path=\(saved.path) px=\(px) copied=\(copy)")
+        Log.write("capture.\(kind).saved path=\(saved.path) px=\(px)")
         thumbnails.add(url: saved, screen: screen)
     }
 

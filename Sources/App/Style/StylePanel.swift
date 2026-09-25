@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 整形パネル。背景・余白・角丸・影を選んでプレビューし、Enter で `_styled.png` を保存してコピーする
+/// 整形パネル。背景・余白・角丸・影を選んでプレビューし、Enter で `_styled.png` を保存する（コピーはサムネイルから）
 final class StylePanelController {
     private var panel: NSPanel?
     private var model: StyleModel?
@@ -54,7 +54,6 @@ final class StylePanelController {
             Toast.shared.show("整形した画像を保存できませんでした")
             return
         }
-        ImageClipboard.copy(out)
         onExported?(out)
     }
 
@@ -136,7 +135,7 @@ private struct StyleView: View {
                 Spacer()
                 Button("キャンセル") { model.onCancel?() }
                     .keyboardShortcut(.cancelAction)
-                Button("保存してコピー") { model.onSave?() }
+                Button("保存") { model.onSave?() }
                     .keyboardShortcut(.defaultAction)
             }
         }
