@@ -5,15 +5,20 @@ final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
     let editor = EditorController()
+    let video = VideoWindowController()
     let recorder = Recorder()
     let history = HistoryController()
     private(set) lazy var aio = AIOController(recorder: recorder)
 
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
-        thumbnails.onEdit = { [weak self] url in self?.editor.open(url) }
-        thumbnails.isEditorOpen = { [weak self] in self?.editor.isOpen ?? false }
+        thumbnails.onEdit = { [weak self] url in
+            if url.pathExtension.lowercased() == "mp4" { self?.video.open(url, mode: .trim) } else { self?.editor.open(url) }
+        }
+        thumbnails.onPreview = { [weak self] url in self?.video.open(url, mode: .preview) }
+        thumbnails.isEditorOpen = { [weak self] in (self?.editor.isOpen ?? false) || (self?.video.isOpen ?? false) }
         editor.onSaved = { [weak self] source, out, back in self?.thumbnails.replace(source, with: out, returnTo: back) }
+        video.onSaved = { [weak self] source, out, back in self?.thumbnails.replace(source, with: out, returnTo: back) }
         // 録画の停止ではフォーカスが動かないので、戻る先は無し（どのアプリの activate でも待ち受けを解く）
         recorder.onSaved = { [weak self] url, screen in
             self?.thumbnails.add(url: url, screen: screen, arm: .init(via: "record", returnTo: nil))

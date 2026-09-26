@@ -1,4 +1,5 @@
 import AppKit
+import CoreMedia
 import ServiceManagement
 #if !DEBUG
 import Sparkle
@@ -182,6 +183,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--aio-snapshot <x> <y> <w> <h> <png>`: その範囲を選んだ状態の暗幕とツールバーを、画面に出さずに PNG に描く
     /// `--record-bar-snapshot <png>`: 録画中の停止バーを、画面に出さずに PNG に描く
     /// `--record-stop-bar`: 録画中なら停止バーの ■ を押したのと同じ経路で止める（record.captured reason=bar）
+    /// `--video-open <preview|trim>`: 最新のサムネイルの録画をプレビュー／トリムのウィンドウで開く（アクティブにしない）/ `--video-dump` / `--video-close`
+    /// `--video-trim <開始秒> <終了秒>`: 最新のサムネイルの録画を、ウィンドウを開かずにトリムの書き出し経路に流す（サムネイルが置き換わる）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -283,6 +286,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 capture.recorder.stop(reason: "bar")
             case "--record-display":
                 if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
+            case "--video-open":
+                if let mode = arg().flatMap(VideoWindowController.Mode.init(rawValue:)), let url = capture.thumbnails.newestURL {
+                    capture.video.open(url, mode: mode, activate: false)
+                }
+            case "--video-dump":
+                Log.write("hook.video \(capture.video.dump())")
+            case "--video-close":
+                capture.video.close()
+            case "--video-trim":
+                if let s = arg().flatMap(Double.init), let e = arg().flatMap(Double.init), let url = capture.thumbnails.newestURL {
+                    capture.video.trim(url, start: CMTime(seconds: s, preferredTimescale: 600), end: CMTime(seconds: e, preferredTimescale: 600))
+                }
             case "--history-open":
                 let kind = queue.first.flatMap(CaptureHistory.Kind.init(rawValue:))
                 if kind != nil { queue.removeFirst() }

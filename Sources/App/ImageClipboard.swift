@@ -18,4 +18,12 @@ enum ImageClipboard {
         Log.write("clipboard.copied name=\(url.lastPathComponent)")
         return true
     }
+
+    /// 録画はファイルそのもの（Finder の ⌘C と同じ file URL）を載せる。Slack・Finder・メールに ⌘V で貼れる
+    static func copyFile(_ url: URL) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([url as NSURL])
+        Log.write("clipboard.copied_file name=\(url.lastPathComponent)")
+    }
 }

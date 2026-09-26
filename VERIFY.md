@@ -22,10 +22,11 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|history|aio|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
+`clipboard.copied` / `clipboard.copied_file`（録画）/ `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p|space` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|preview|history|aio|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
 `aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= rect=` / `record.bar_shown placement=below|above|inside frame=` /
+`video.opened mode=preview|trim name= size= window=` / `video.trimmed name= start= end=` / `video.trim_unchanged` / `video.trim_cancelled` / `video.trim_failed` / `video.closed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
@@ -74,6 +75,15 @@ ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p
 "${B[@]}" --record-bar-snapshot $S/bar.png                                   # バーだけを描く（経過時間は 0:12 固定）
 "${B[@]}" --aio-record 0 0 2560 1440 30; sleep 5; screencapture -x -D 2 $S/screen.png; "${B[@]}" --record-stop-bar
 # ↑ 画面いっぱい → placement=inside。スクショの右下にバーが出ていて、同じ時刻の mp4 の右下（ffmpeg -ss 3 … -vf crop=…）には写っていない（mycap はフィルタで外している）
+# 録画のサムネイル（fixture: ffmpeg -f lavfi -i testsrc=size=640x360:rate=30 -t 6 -pix_fmt yuv420p clip.mp4。音声付きは -f lavfi -i sine=frequency=440 を足して -shortest）
+"${B[@]}" --ingest $S/fx/clip.mp4 --dump-thumbs   # video=0:06_·_40_KB audio=false info_shown=true playing=false
+"${B[@]}" --hover; sleep 1.5; "${B[@]}" --dump-thumbs --snapshot $S/v-hover.png --unhover
+# ↑ playing=true progress=（1.5 秒で 240×1.5/6 ≈ 60）info_shown=false。--snapshot に再生中の映像は写らない（AVPlayerLayer はプロセス内描画に出ない）ので、映像は screencapture -x -R で見る
+"${B[@]}" --video-trim 1 3; sleep 3; "${B[@]}" --dump-thumbs   # video.trimmed / thumbnail.replaced（同じ frame、名前が _edited.mp4、0:02）。ffprobe で 2.0 秒
+"${B[@]}" --video-trim 0 99      # 範囲が元と同じ → video.trim_unchanged（書き出さない）
+"${B[@]}" --video-open trim --video-dump   # AVPlayerView のトリム UI（trimming=true）。アクティブにしないので、見た目は screencapture -R で撮る
+"${B[@]}" --video-close
+# 実際のキー（Space / ⌘C / ⌘E）・ダブルクリック・トリムのハンドル操作と「トリミング」・プレビューの再生は人間が確かめる
 # OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）

@@ -30,8 +30,10 @@ final class ThumbnailController {
 
     /// サムネイルの「ピン留め」から呼ぶ
     var onPin: ((URL) -> Void)?
-    /// サムネイルの「編集」から呼ぶ
+    /// サムネイルの「編集」から呼ぶ（録画はトリム）
     var onEdit: ((URL) -> Void)?
+    /// 録画のサムネイルの「プレビュー」から呼ぶ
+    var onPreview: ((URL) -> Void)?
     /// 編集ウィンドウが開いている間は、待ち受けでキーを取らない（編集の ⌘S が「Downloads へ保存」に化けないように）
     var isEditorOpen: (() -> Bool)?
 
@@ -44,27 +46,36 @@ final class ThumbnailController {
     var count: Int { items.count }
 
     func add(url: URL, screen: NSScreen, arm: Arm? = nil) {
-        if url.pathExtension.lowercased() == "mp4" {
-            // 動画は先頭のフレームをサムネイルにする
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-            generator.appliesPreferredTrackTransform = true
-            generator.generateCGImageAsynchronously(for: .zero) { [weak self] cg, _, error in
-                DispatchQueue.main.async {
-                    guard let cg else {
-                        Log.write("thumbnail.video_frame_failed path=\(url.path) error=\(String(describing: error))")
-                        return
-                    }
-                    self?.add(url: url, image: NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)),
-                              isVideo: true, screen: screen, arm: arm)
-                }
+        Self.load(url) { [weak self] image, video in
+            self?.add(url: url, image: image, video: video, screen: screen, arm: arm)
+        }
+    }
+
+    /// サムネイルの画像を読む。録画は先頭のフレームと、長さ・大きさ・音声の有無（非同期。読めなければ呼ばない）
+    private static func load(_ url: URL, completion: @escaping (NSImage, VideoInfo?) -> Void) {
+        guard url.pathExtension.lowercased() == "mp4" else {
+            guard let image = NSImage(contentsOf: url) else {
+                Log.write("thumbnail.load_failed path=\(url.path)")
+                return
             }
+            completion(image, nil)
             return
         }
-        guard let image = NSImage(contentsOf: url) else {
-            Log.write("thumbnail.load_failed path=\(url.path)")
-            return
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        Task { @MainActor in
+            do {
+                let (cg, _) = try await generator.image(at: .zero)
+                let duration = (try? await asset.load(.duration).seconds) ?? 0
+                let audio = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
+                let bytes = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.int64Value ?? 0
+                let info = VideoInfo(duration: duration.isFinite ? duration : 0, bytes: bytes, hasAudio: !audio.isEmpty)
+                completion(NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)), info)
+            } catch {
+                Log.write("thumbnail.video_frame_failed path=\(url.path) error=\(error)")
+            }
         }
-        add(url: url, image: image, isVideo: false, screen: screen, arm: arm)
     }
 
     /// キャプチャ履歴から戻す。同じファイルのサムネイルが出ていたら、それを閉じて最新の位置に出し直す
@@ -75,20 +86,28 @@ final class ThumbnailController {
         add(url: url, screen: screen, arm: arm)
     }
 
-    /// 編集して保存したとき。元のサムネイルを同じ位置で編集後の画像に差し替える（元が閉じていれば最新として出す）
+    /// 編集（録画はトリム）して保存したとき。元のサムネイルを同じ位置で編集後のものに差し替える（元が閉じていれば最新として出す）
     func replace(_ old: URL, with new: URL, returnTo: String? = nil) {
         let arm = Arm(via: "replace", returnTo: returnTo)
-        guard let index = items.firstIndex(where: { $0.panel.url == old }) else {
+        guard items.contains(where: { $0.panel.url == old }) else {
             Log.write("thumbnail.replace_missing old=\(old.lastPathComponent)")
             add(url: new, screen: .underMouse, arm: arm)
             return
         }
-        guard let image = NSImage(contentsOf: new) else {
-            Log.write("thumbnail.load_failed path=\(new.path)")
+        Self.load(new) { [weak self] image, video in
+            self?.swap(old, with: new, image: image, video: video, arm: arm)
+        }
+    }
+
+    private func swap(_ old: URL, with new: URL, image: NSImage, video: VideoInfo?, arm: Arm) {
+        // 録画の読み込みを待つ間に閉じられていたら、最新として出す
+        guard let index = items.firstIndex(where: { $0.panel.url == old }) else {
+            Log.write("thumbnail.replace_missing old=\(old.lastPathComponent)")
+            add(url: new, image: image, video: video, screen: .underMouse, arm: arm)
             return
         }
         let oldPanel = items[index].panel
-        let newPanel = makePanel(url: new, image: image, isVideo: false)
+        let newPanel = makePanel(url: new, image: image, video: video)
         items[index] = Item(panel: newPanel, screenID: items[index].screenID)
         // 新しいパネルがキーを取る前に、古いパネルのキーを手放す
         if armed === oldPanel { disarm(reason: "next") }
@@ -99,23 +118,23 @@ final class ThumbnailController {
         startArm(newPanel, arm)
     }
 
-    private func add(url: URL, image: NSImage, isVideo: Bool, screen: NSScreen, arm: Arm?) {
-        let panel = makePanel(url: url, image: image, isVideo: isVideo)
+    private func add(url: URL, image: NSImage, video: VideoInfo?, screen: NSScreen, arm: Arm?) {
+        let panel = makePanel(url: url, image: image, video: video)
         items.insert(Item(panel: panel, screenID: screen.displayID), at: 0)
         for old in items.suffix(ThumbnailLayout.overflow(count: items.count)) {
             close(old.panel, reason: "overflow")
         }
         relayout(animated: true, newest: panel)
-        Log.write("thumbnail.added name=\(url.lastPathComponent) video=\(isVideo) screen=\(screen.displayID) count=\(items.count)")
+        Log.write("thumbnail.added name=\(url.lastPathComponent) video=\(video != nil) screen=\(screen.displayID) count=\(items.count)")
         if let arm { startArm(panel, arm) }
     }
 
-    private func makePanel(url: URL, image: NSImage, isVideo: Bool) -> ThumbnailPanel {
+    private func makePanel(url: URL, image: NSImage, video: VideoInfo?) -> ThumbnailPanel {
         let size = ThumbnailLayout.panelSize(for: image.size)
         var panel: ThumbnailPanel!
         let actions = ThumbnailView.Actions(
             copy: { [weak self] in
-                ImageClipboard.copy(url)
+                if video != nil { ImageClipboard.copyFile(url) } else { ImageClipboard.copy(url) }
                 Toast.shared.show("Copied", near: panel.frame)
                 self?.close(panel, reason: "copied")
             },
@@ -143,10 +162,14 @@ final class ThumbnailController {
                 self?.disarm(reason: "edit")
                 self?.onEdit?(url)
             },
+            preview: { [weak self] in
+                self?.disarm(reason: "preview")
+                self?.onPreview?(url)
+            },
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }
         )
-        panel = ThumbnailPanel(url: url, image: image, size: size, isVideo: isVideo, actions: actions)
+        panel = ThumbnailPanel(url: url, image: image, size: size, video: video, actions: actions)
         panel.thumbnailView.onHoverChange = { [weak self, weak panel] entered in
             guard let self, let panel, entered, let current = armed else { return }
             // 乗せたのが待ち受け中の 1 枚ならホバーに引き継ぐ。別の 1 枚なら、そちらがキーを取れるよう先に解く
@@ -286,9 +309,12 @@ final class ThumbnailController {
     func dump() -> [String] {
         items.map {
             let v = $0.panel.thumbnailView
-            return "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\(v.isHovered) armed=\(v.isArmed) keys=\(v.keyCount)"
+            return "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\(v.isHovered) armed=\(v.isArmed) keys=\(v.keyCount)\(v.videoState.map { " " + $0 } ?? "")"
         }
     }
+
+    /// 最新のサムネイル（のファイル）。検証フックの `--video-trim` 等
+    var newestURL: URL? { items.first?.panel.url }
 
     /// 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えて使う）
     func saveNewest() {

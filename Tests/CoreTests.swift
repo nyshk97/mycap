@@ -333,3 +333,21 @@ final class CaptureHistoryTests: XCTestCase {
         XCTAssertEqual(CaptureHistory.moveFocus(5, by: 0, count: 3), 2)
     }
 }
+
+final class VideoInfoTextTests: XCTestCase {
+    func testLabelJoinsDurationAndSize() {
+        XCTAssertEqual(VideoInfoText.label(seconds: 12.4, bytes: 2_400_000), "0:12 · 2.4 MB")
+        XCTAssertEqual(VideoInfoText.label(seconds: 65.6, bytes: 850_000), "1:06 · 850 KB")
+        XCTAssertEqual(VideoInfoText.label(seconds: 3723, bytes: 1_234_000_000), "1:02:03 · 1.2 GB")
+    }
+
+    func testSizeUsesDecimalUnitsLikeFinder() {
+        XCTAssertEqual(VideoInfoText.size(0), "0 B")
+        XCTAssertEqual(VideoInfoText.size(999), "999 B")
+        XCTAssertEqual(VideoInfoText.size(1_500), "2 KB")
+        XCTAssertEqual(VideoInfoText.size(1_000_000), "1.0 MB")
+        XCTAssertEqual(VideoInfoText.size(9_949_999), "9.9 MB")
+        XCTAssertEqual(VideoInfoText.size(12_600_000), "13 MB")
+        XCTAssertEqual(VideoInfoText.size(2_000_000_000_000), "2000 GB")
+    }
+}

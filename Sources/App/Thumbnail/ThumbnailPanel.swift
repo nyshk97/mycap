@@ -1,15 +1,23 @@
 import AppKit
+import AVFoundation
 import Carbon
 import CoreImage
+
+/// 録画のサムネイルに出す情報（長さ・大きさ・音声の有無）
+struct VideoInfo {
+    let duration: TimeInterval
+    let bytes: Int64
+    let hasAudio: Bool
+}
 
 /// 撮影後に画面の隅へ出るサムネイル 1 枚。アプリをアクティブにしない NSPanel で、全 Space・フルスクリーンの上にも出る
 final class ThumbnailPanel: NSPanel {
     let url: URL
     let thumbnailView: ThumbnailView
 
-    init(url: URL, image: NSImage, size: NSSize, isVideo: Bool, actions: ThumbnailView.Actions) {
+    init(url: URL, image: NSImage, size: NSSize, video: VideoInfo?, actions: ThumbnailView.Actions) {
         self.url = url
-        thumbnailView = ThumbnailView(frame: NSRect(origin: .zero, size: size), url: url, image: image, isVideo: isVideo, actions: actions)
+        thumbnailView = ThumbnailView(frame: NSRect(origin: .zero, size: size), url: url, image: image, video: video, actions: actions)
         super.init(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isOpaque = false
@@ -28,16 +36,19 @@ final class ThumbnailPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// サムネイルの中身。画像・ホバー時のボタン・ドラッグでの持ち出し
+/// サムネイルの中身。画像・ホバー時のボタン・ドラッグでの持ち出し。
+/// 録画はホバー中にサムネイルの中で無音ループ再生し、下端に進捗バーを出す
 final class ThumbnailView: NSView, NSDraggingSource {
     struct Actions {
-        /// コピー・保存・OCR は済んだらサムネイルを閉じる（保存は失敗したら閉じない）。編集・ピン留めは閉じない
+        /// コピー・保存・OCR は済んだらサムネイルを閉じる（保存は失敗したら閉じない）。編集（録画はトリム）・ピン留め・プレビューは閉じない
         var copy: () -> Void
         /// ~/Downloads へ保存する
         var save: () -> Void
         var pin: () -> Void
         var ocr: () -> Void
         var edit: () -> Void
+        /// 録画を大きく再生する（目のボタン / Space）
+        var preview: () -> Void
         var close: () -> Void
         /// ドラッグで持ち出せたとき（ドロップ先が受け取ったとき）
         var draggedOut: () -> Void
@@ -46,9 +57,19 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private let url: URL
     private let image: NSImage
     private let actions: Actions
-    /// 動画はコピー・ピン・OCR・編集を出さない（保存・閉じる・ドラッグだけ）
-    private let isVideo: Bool
+    /// 録画のときだけある。録画はピン・OCR を出さず、編集の代わりにトリム、ピンの代わりにプレビュー
+    private let video: VideoInfo?
+    private var isVideo: Bool { video != nil }
     private let overlay = NSView()
+    private var infoPills: NSView?
+    /// ホバー中の再生（最初に乗せたときに作る）
+    private var player: AVQueuePlayer?
+    private var looper: AVPlayerLooper?
+    private var playerLayer: AVPlayerLayer?
+    private var timeObserver: Any?
+    private let progress = NSView()
+    /// Space（プレビュー）はホバー中だけ取る。待ち受け中に取ると、前面のアプリで打った空白を奪うため
+    private var spaceToken: UInt32?
     private var mouseDownPoint: NSPoint?
     /// ホバー中・待ち受け中だけ取っているキー（Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P）の登録 id
     private var keyTokens: [UInt32] = []
@@ -59,10 +80,10 @@ final class ThumbnailView: NSView, NSDraggingSource {
     var onHoverChange: ((Bool) -> Void)?
     var keyCount: Int { keyTokens.count }
 
-    init(frame: NSRect, url: URL, image: NSImage, isVideo: Bool, actions: Actions) {
+    init(frame: NSRect, url: URL, image: NSImage, video: VideoInfo?, actions: Actions) {
         self.url = url
         self.image = image
-        self.isVideo = isVideo
+        self.video = video
         self.actions = actions
         super.init(frame: frame)
         wantsLayer = true
@@ -77,29 +98,37 @@ final class ThumbnailView: NSView, NSDraggingSource {
         imageView.autoresizingMask = [.width, .height]
         addSubview(imageView)
 
-        // ホバー中は CleanShot X と同じく、画像をぼかして暗くした上にボタンを出す
+        // ホバー中は CleanShot X と同じく、画像をぼかして暗くした上にボタンを出す。
+        // 録画はぼかさず薄く暗くするだけ（再生している中身が見えるように）
         overlay.frame = bounds
         overlay.autoresizingMask = [.width, .height]
         overlay.wantsLayer = true
         overlay.isHidden = true
-        let blurred = NSImageView(frame: bounds)
-        blurred.image = Self.blurred(image, displayWidth: frame.width)
-        blurred.imageScaling = .scaleProportionallyUpOrDown
-        blurred.autoresizingMask = [.width, .height]
-        overlay.addSubview(blurred)
+        if !isVideo {
+            let blurred = NSImageView(frame: bounds)
+            blurred.image = Self.blurred(image, displayWidth: frame.width)
+            blurred.imageScaling = .scaleProportionallyUpOrDown
+            blurred.autoresizingMask = [.width, .height]
+            overlay.addSubview(blurred)
+        }
         let dim = NSView(frame: bounds)
         dim.wantsLayer = true
-        dim.layer?.backgroundColor = NSColor(white: 0, alpha: 0.45).cgColor
+        dim.layer?.backgroundColor = NSColor(white: 0, alpha: isVideo ? 0.25 : 0.45).cgColor
         dim.autoresizingMask = [.width, .height]
         overlay.addSubview(dim)
         addSubview(overlay)
         buildButtons()
-        if isVideo { addVideoBadge() }
+        if let video { addVideoInfo(video) }
+    }
+
+    deinit {
+        if let timeObserver { player?.removeTimeObserver(timeObserver) }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// 四隅に丸ボタン（左上 閉じる・右上 ピン・左下 編集・右下 OCR）、中央に Copy / Save。動画は閉じると Save だけ
+    /// 四隅に丸ボタン（左上 閉じる・右上 ピン・左下 編集・右下 OCR）、中央に Copy / Save。
+    /// 録画は 左上 閉じる・右上 プレビュー・左下 トリム・右下 コピー、中央に Save だけ
     private func buildButtons() {
         let inset: CGFloat = 7
         let d = CircleButton.diameter
@@ -110,7 +139,11 @@ final class ThumbnailView: NSView, NSDraggingSource {
             overlay.addSubview(button)
         }
         corner(CircleButton("xmark", tip: "閉じる（Esc）") { [weak self] in self?.actions.close() }, left: true, top: true)
-        if !isVideo {
+        if isVideo {
+            corner(CircleButton("eye", tip: "プレビュー（Space）") { [weak self] in self?.actions.preview() }, left: false, top: true)
+            corner(CircleButton("scissors", tip: "トリム（⌘E）") { [weak self] in self?.actions.edit() }, left: true, top: false)
+            corner(CircleButton("doc.on.doc", tip: "コピー（⌘C）") { [weak self] in self?.actions.copy() }, left: false, top: false)
+        } else {
             corner(CircleButton("pin.fill", tip: "ピン留め（⌘P）") { [weak self] in self?.actions.pin() }, left: false, top: true)
             corner(CircleButton("pencil", tip: "編集（矢印・四角・モザイク・文字）（⌘E）") { [weak self] in self?.actions.edit() }, left: true, top: false)
             corner(CircleButton("text.viewfinder", tip: "OCR（文字をコピー）（⌘O）") { [weak self] in self?.actions.ocr() }, left: false, top: false)
@@ -142,13 +175,97 @@ final class ThumbnailView: NSView, NSDraggingSource {
         return NSImage(cgImage: out, size: image.size)
     }
 
-    /// 動画だと分かる印（左下の再生マーク）
-    private func addVideoBadge() {
-        let badge = NSImageView(frame: NSRect(x: 8, y: 8, width: 22, height: 22))
-        badge.image = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: "動画")?
-            .withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
-        badge.contentTintColor = .white
-        addSubview(badge, positioned: .below, relativeTo: overlay)
+    /// 左下の「🎥 0:12 · 2.4 MB」と、音声があれば 🔊。ホバー中は隠す（トリムのボタンと重なるため）
+    private func addVideoInfo(_ video: VideoInfo) {
+        func pill(symbol: String, text: String?) -> NSView {
+            let icon = NSImageView()
+            icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 9, weight: .bold))
+            icon.contentTintColor = .white
+            var views: [NSView] = [icon]
+            if let text {
+                let label = NSTextField(labelWithString: text)
+                label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+                label.textColor = .white
+                views.append(label)
+            }
+            let stack = NSStackView(views: views)
+            stack.spacing = 4
+            stack.edgeInsets = NSEdgeInsets(top: 0, left: 7, bottom: 0, right: 7)
+            stack.wantsLayer = true
+            stack.layer?.backgroundColor = NSColor(white: 0, alpha: 0.62).cgColor
+            stack.layer?.cornerRadius = 10
+            stack.heightAnchor.constraint(equalToConstant: 20).isActive = true
+            return stack
+        }
+        var pills = [pill(symbol: "video.fill", text: VideoInfoText.label(seconds: video.duration, bytes: video.bytes))]
+        if video.hasAudio { pills.append(pill(symbol: "speaker.wave.2.fill", text: nil)) }
+        let row = NSStackView(views: pills)
+        row.spacing = 4
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row, positioned: .below, relativeTo: overlay)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 7),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -7),
+            row.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -7),
+        ])
+        infoPills = row
+
+        progress.wantsLayer = true
+        progress.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+        progress.frame = NSRect(x: 0, y: 0, width: 0, height: 3)
+        progress.isHidden = true
+        addSubview(progress)
+    }
+
+    // MARK: - ホバー中の再生
+
+    private func startPlayback() {
+        guard isVideo else { return }
+        if player == nil {
+            let item = AVPlayerItem(url: url)
+            let queue = AVQueuePlayer()
+            queue.isMuted = true
+            looper = AVPlayerLooper(player: queue, templateItem: item)
+            let layer = AVPlayerLayer(player: queue)
+            layer.videoGravity = .resizeAspect
+            layer.frame = bounds
+            layer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+            // 先頭のフレームの画像と overlay の間に挟む
+            let host = NSView(frame: bounds)
+            host.autoresizingMask = [.width, .height]
+            host.wantsLayer = true
+            host.layer?.addSublayer(layer)
+            addSubview(host, positioned: .below, relativeTo: infoPills ?? overlay)
+            let duration = max(video?.duration ?? 0, 0.01)
+            timeObserver = queue.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] time in
+                guard let self else { return }
+                let t = time.seconds.truncatingRemainder(dividingBy: duration)
+                progress.frame.size.width = bounds.width * CGFloat(min(max(t / duration, 0), 1))
+            }
+            player = queue
+            playerLayer = layer
+        }
+        playerLayer?.isHidden = false
+        progress.isHidden = false
+        player?.seek(to: .zero)
+        player?.play()
+    }
+
+    private func stopPlayback() {
+        guard let player else { return }
+        player.pause()
+        playerLayer?.isHidden = true
+        progress.isHidden = true
+        progress.frame.size.width = 0
+    }
+
+    /// 検証フックの `--dump-thumbs` 用。録画でなければ nil
+    var videoState: String? {
+        guard let video else { return nil }
+        let label = VideoInfoText.label(seconds: video.duration, bytes: video.bytes).replacingOccurrences(of: " ", with: "_")
+        let playing = (player?.rate ?? 0) > 0
+        return "video=\(label) audio=\(video.hasAudio) info_shown=\(!(infoPills?.isHidden ?? true)) playing=\(playing) progress=\(Int(progress.frame.width)) space=\(spaceToken != nil)"
     }
 
     /// 検証フックの `--save-newest` 用
@@ -186,8 +303,19 @@ final class ThumbnailView: NSView, NSDraggingSource {
     /// ホバーしていない間は登録しないので、前面のアプリの ⌘C 等はそのまま効く（待ち受け中を除く）。
     /// `grabKeys: false` は検証フックでボタンの見た目だけ撮るとき
     func setHovered(_ hovered: Bool, grabKeys: Bool = true) {
+        let changed = isHovered != hovered
         isHovered = hovered
         overlay.isHidden = !hovered
+        infoPills?.isHidden = hovered
+        if changed { hovered ? startPlayback() : stopPlayback() }
+        if isVideo {
+            if hovered, grabKeys, spaceToken == nil {
+                spaceToken = register(kVK_Space, 0, "space") { [weak self] in self?.actions.preview() }
+            } else if !hovered, let token = spaceToken {
+                HotKeyCenter.shared.unregister(token)
+                spaceToken = nil
+            }
+        }
         if hovered, grabKeys, keyTokens.isEmpty {
             registerHoverKeys()
         } else if !hovered, !isArmed {
@@ -217,29 +345,30 @@ final class ThumbnailView: NSView, NSDraggingSource {
         keyTokens.removeAll()
     }
 
+    private func register(_ code: Int, _ mods: Int, _ name: String, _ run: @escaping () -> Void) -> UInt32? {
+        let result = HotKeyCenter.shared.registerToken(keyCode: code, modifiers: mods) {
+            Log.write("thumbnail.key key=\(name)")
+            run()
+        }
+        if result.id == nil { Log.write("thumbnail.key_register_failed key=\(name) status=\(result.status)") }
+        return result.id
+    }
+
     private func registerHoverKeys() {
         var keys: [(code: Int, mods: Int, name: String, run: () -> Void)] = [
             (kVK_Escape, 0, "esc", { [weak self] in self?.actions.close() }),
             (kVK_ANSI_S, cmdKey, "cmd_s", { [weak self] in self?.actions.save() }),
+            (kVK_ANSI_C, cmdKey, "cmd_c", { [weak self] in self?.actions.copy() }),
+            (kVK_ANSI_E, cmdKey, "cmd_e", { [weak self] in self?.actions.edit() }),
         ]
         if !isVideo {
             keys += [
-                (kVK_ANSI_C, cmdKey, "cmd_c", { [weak self] in self?.actions.copy() }),
                 (kVK_ANSI_O, cmdKey, "cmd_o", { [weak self] in self?.actions.ocr() }),
-                (kVK_ANSI_E, cmdKey, "cmd_e", { [weak self] in self?.actions.edit() }),
                 (kVK_ANSI_P, cmdKey, "cmd_p", { [weak self] in self?.actions.pin() }),
             ]
         }
         for key in keys {
-            let result = HotKeyCenter.shared.registerToken(keyCode: key.code, modifiers: key.mods) { [name = key.name, run = key.run] in
-                Log.write("thumbnail.key key=\(name)")
-                run()
-            }
-            if let id = result.id {
-                keyTokens.append(id)
-            } else {
-                Log.write("thumbnail.key_register_failed key=\(key.name) status=\(result.status)")
-            }
+            if let id = register(key.code, key.mods, key.name, key.run) { keyTokens.append(id) }
         }
     }
 
@@ -255,6 +384,12 @@ final class ThumbnailView: NSView, NSDraggingSource {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
+        // 録画はダブルクリックでトリム（CleanShot X と同じ）
+        if isVideo, event.clickCount == 2 {
+            mouseDownPoint = nil
+            actions.edit()
+            return
+        }
         mouseDownPoint = event.locationInWindow
     }
 
