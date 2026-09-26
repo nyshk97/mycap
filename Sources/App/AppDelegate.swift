@@ -175,8 +175,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--annotate <png> <json> <out.png>`: 注釈（`[Annotation]` の JSON）を焼き込んで書き出す
     /// `--edit-open <png>`: 編集ウィンドウを開く（アクティブにしない）/ `--edit-load <json>`: 注釈を足す / `--edit-select <n>` / `--edit-color <n>`（プリセットの添字）
     /// `--edit-undo` / `--edit-dump`（要素・選択・取り消しの深さをログへ）/ `--edit-snapshot <png>` / `--edit-save`（保存してサムネイルを置き換える）/ `--edit-close`（確認なしで破棄）
-    /// `--history-open [screenshots|videos]`: キャプチャ履歴を開く（アクティブにしない）/ `--history-dump`: タブ・件数・フォーカス・各項目をログへ
-    /// `--history-focus <n>` / `--history-kind <screenshots|videos>` / `--history-restore`（フォーカス中を戻す）/ `--history-snapshot <png>` / `--history-close`
+    /// `--history-open [all|screenshots|videos]`: キャプチャ履歴を開く（アクティブにしない）/ `--history-dump`: タブ・件数・フォーカス・各項目をログへ
+    /// `--history-focus <n>` / `--history-kind <all|screenshots|videos>` / `--history-restore`（フォーカス中を戻す）/ `--history-snapshot <png>` / `--history-close`
     /// `--record-audio <mic,system|mic|system|none>`: 録画に入れる音声を設定する（ツールバーのトグルと同じ UserDefaults に書く）。録画のフックより前に置く
     /// `--mix-audio <in.mp4>`: 録画の停止後と同じ経路で音声トラックを 1 本に混ぜ、一時ファイルに書いてログに出す（許可が要らない。サムネイルには出さない）
     /// `--record-display <秒>`: カウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
@@ -334,7 +334,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--history-open":
                 let kind = queue.first.flatMap(CaptureHistory.Kind.init(rawValue:))
                 if kind != nil { queue.removeFirst() }
-                capture.history.open(kind: kind ?? .screenshots, activate: false)
+                capture.history.open(kind: kind ?? .all, activate: false)
             case "--history-dump":
                 Log.write("hook.history \(capture.history.dump())")
             case "--history-focus":

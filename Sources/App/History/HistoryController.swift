@@ -53,7 +53,7 @@ final class HistoryController {
     }
 
     /// `activate: false` は検証フック用（フォーカスを奪わずに表示だけする）
-    func open(kind: CaptureHistory.Kind = .screenshots, activate: Bool = true) {
+    func open(kind: CaptureHistory.Kind = .all, activate: Bool = true) {
         onOpen?()
         if isOpen { close(.hook) }
         let front = NSWorkspace.shared.frontmostApplication
@@ -186,7 +186,7 @@ struct HistoryItem: Identifiable {
 }
 
 final class HistoryModel: ObservableObject {
-    @Published private(set) var kind: CaptureHistory.Kind = .screenshots
+    @Published private(set) var kind: CaptureHistory.Kind = .all
     @Published private(set) var items: [HistoryItem] = []
     @Published var focus: Int?
     /// キーボードで動かしたときだけスクロールで追う（ホバーで追うと並びが動いてしまう）
@@ -273,7 +273,7 @@ final class HistoryModel: ObservableObject {
         let gen = generation
         for item in items where thumbs[item.id] == nil {
             let id = item.id, url = item.url
-            if kind == .videos {
+            if CaptureHistory.Kind.of(ext: url.pathExtension) == .videos {
                 let asset = AVURLAsset(url: url)
                 let generator = AVAssetImageGenerator(asset: asset)
                 generator.appliesPreferredTrackTransform = true

@@ -61,7 +61,7 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --ingest $S/fx/wide.png --history-open   # reason=history（--history-restore は via=restore、--edit-save は via=replace で armed）
 # クリック・アプリ切り替え・実際のキー（keys>0）は合成できないので人間が確かめる
 # キャプチャ履歴（アクティブにしないで開く。動画の fixture は ffmpeg -f lavfi -i testsrc=size=640x360:rate=30 -t 3 -pix_fmt yuv420p clip.mp4）
-"${B[@]}" --history-open; "${B[@]}" --history-dump   # hook.history に kind / count / focus / 各項目の 名前|相対時刻|app=|icon=|thumb=|focused
+"${B[@]}" --history-open; "${B[@]}" --history-dump   # 既定は kind=all（count = screenshots + videos）。hook.history に kind / count / focus / 各項目の 名前|相対時刻|app=|icon=|thumb=|focused
 "${B[@]}" --history-focus 2 --history-kind videos --history-snapshot $S/history.png
 "${B[@]}" --history-restore      # フォーカス中をサムネイルに戻す → history.restored / thumbnail.added（同じファイルが出ていたら thumbnail.closed reason=restored_again）
 "${B[@]}" --history-close

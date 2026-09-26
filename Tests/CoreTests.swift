@@ -287,6 +287,7 @@ final class CaptureHistoryTests: XCTestCase {
         XCTAssertEqual(CaptureHistory.Kind.of(ext: "mp4"), .videos)
         XCTAssertNil(CaptureHistory.Kind.of(ext: "tmp"))
         XCTAssertNil(CaptureHistory.Kind.of(ext: ""))
+        XCTAssertEqual(CaptureHistory.Kind.allCases.first, .all)
     }
 
     func testItemsFilterByKindNewestFirst() {
@@ -299,6 +300,7 @@ final class CaptureHistoryTests: XCTestCase {
         ]
         XCTAssertEqual(CaptureHistory.items(files, kind: .screenshots).map(\.name), ["c_edited.png", "d.png", "a.png"])
         XCTAssertEqual(CaptureHistory.items(files, kind: .videos).map(\.name), ["b.mp4"])
+        XCTAssertEqual(CaptureHistory.items(files, kind: .all).map(\.name), ["c_edited.png", "b.mp4", "d.png", "a.png"])
     }
 
     func testItemsSameTimeUsesNameDescending() {

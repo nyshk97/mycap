@@ -3,16 +3,18 @@ import Foundation
 /// キャプチャ履歴（キャッシュに残っている撮影結果の一覧）の並べ方と表示の文言（純粋関数）
 enum CaptureHistory {
     enum Kind: String, CaseIterable {
-        case screenshots, videos
+        /// 並び順がタブの順。先頭の all が開いたときの既定
+        case all, screenshots, videos
 
         var title: String {
             switch self {
+            case .all: "All"
             case .screenshots: "Screenshots"
             case .videos: "Videos"
             }
         }
 
-        /// 拡張子から種別を決める。キャッシュには png（静止画・編集の出力）と mp4（録画）しか置かない
+        /// 拡張子から種別を決める（all にはならない）。キャッシュには png（静止画・編集の出力）と mp4（録画）しか置かない
         static func of(ext: String) -> Kind? {
             switch ext.lowercased() {
             case "png": .screenshots
@@ -27,10 +29,13 @@ enum CaptureHistory {
         let created: Date
     }
 
-    /// 種別で絞り込み、新しい順に並べる。同じ時刻なら名前の降順（`_2` を先に）
+    /// 種別で絞り込み（all は静止画と録画を混ぜる）、新しい順に並べる。同じ時刻なら名前の降順（`_2` を先に）
     static func items(_ files: [Entry], kind: Kind) -> [Entry] {
         files
-            .filter { Kind.of(ext: ($0.name as NSString).pathExtension) == kind }
+            .filter {
+                guard let k = Kind.of(ext: ($0.name as NSString).pathExtension) else { return false }
+                return kind == .all || k == kind
+            }
             .sorted { $0.created != $1.created ? $0.created > $1.created : $0.name > $1.name }
     }
 

@@ -11,7 +11,7 @@ struct HistoryView: View {
             tabs
             if model.items.isEmpty {
                 Spacer()
-                Text(model.kind == .screenshots ? "No screenshots in the last 7 days" : "No videos in the last 7 days")
+                Text("No \(model.kind == .all ? "captures" : model.kind.title.lowercased()) in the last 7 days")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.secondary)
                 Spacer()
