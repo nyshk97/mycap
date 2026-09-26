@@ -58,6 +58,7 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 ```
 
 - 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の左端 = visibleFrame.minX + 16、下端 = visibleFrame.minY + 16 になる
+- 実際の画面での見た目（角丸・影・置かれた場所）は、`--ingest` で出したあとに `screencapture -x -R <x>,<y>,<w>,<h>` でその領域だけ撮って見る。`-R` は左上原点なので y = 主画面の frame の高さ − AppKit の maxY。撮影の選択 UI は出ず、許可は mycap でなく Claude Code を動かしているターミナル側のものを使う（2026-09-26 に個人 PC で撮れた）。ユーザーの画面の一部が写るので、撮る領域はサムネイルの周りに絞る
 - 同じ秒に複数枚入れると `_2` `_3` が付く
 - `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
 - `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）
