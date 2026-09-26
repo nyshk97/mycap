@@ -13,6 +13,9 @@ Capit の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 ```markdown
 ## [Unreleased]
 
+### 📝 Changed
+- 正式版として 1.0.0 に（機能の変更なし）
+
 ### ✨ Added
 - メニューに「アップデートを確認…」を追加
 
