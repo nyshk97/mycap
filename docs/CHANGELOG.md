@@ -44,6 +44,8 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-26
+
 ### ✨ Added
 - 前回と同じ範囲を撮るホットキー（⌘⇧6）
 - サムネイルにマウスが乗っている間だけ効くショートカット（⌘C コピー・⌘S 保存・⌘O OCR・⌘E 整形・⌘P ピン留め）
