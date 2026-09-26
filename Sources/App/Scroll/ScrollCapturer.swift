@@ -1,9 +1,10 @@
 import AppKit
+import Carbon
 import CoreMedia
 import ScreenCaptureKit
 
 /// スクロールキャプチャ。オールインワン（⌘⇧5）で選んだ範囲を SCStream で流し、ユーザーが手でスクロールするたびに届くコマを
-/// `ScrollStitcher` で縦につなぐ。Done（バー・⌘⇧5・メニューバー）で 1 枚の PNG にして `onSaved` に渡す。
+/// `ScrollStitcher` で縦につなぐ。Done（バー・Return・⌘⇧5・メニューバー）で 1 枚の PNG にして `onSaved` に渡す。
 /// コマの受け取りは `deliveryQueue`、照合とまとめは `workQueue`（どちらもシリアル）。照合中に届いたコマは最新の 1 枚だけを持っておき、
 /// 今の照合が終わったらそれを処理する（スクロールを止めた位置のコマを落とさないため。止まった後は `.idle` しか届かない）
 final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
@@ -25,6 +26,8 @@ final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
     private var scale: CGFloat = 2
     /// starting 中に Done / Cancel が来たときの終わり方（startCapture の完了で終える）
     private var pendingEnd: String?
+    /// 撮影中だけ取る Return / テンキーの Enter（Done）
+    private var enterTokens: [UInt32] = []
 
     // workQueue だけで触る
     private var stitcher = ScrollStitcher()
@@ -112,6 +115,9 @@ final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
                 let global = AIOLayout.global(rect, screenFrame: screen.frame)
                 self.overlay.show(around: global, on: screen, onDone: { self.finish(reason: "done") },
                                   onCancel: { self.cancel() })
+                self.enterTokens = [kVK_Return, kVK_ANSI_KeypadEnter].compactMap {
+                    HotKeyCenter.shared.registerToken(keyCode: $0, modifiers: 0) { [weak self] in self?.finish(reason: "enter") }.id
+                }
                 let size = self.overlay.previewSize ?? .zero
                 let rows = size.width > 0 ? Int(CGFloat(config.width) * size.height / size.width) : 0
                 self.workQueue.async { self.previewRows = rows }
@@ -119,7 +125,7 @@ final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
         }
     }
 
-    /// Done: つないだ画像を保存する。`reason` は done（バー）・hotkey・menu_bar・limit・stream_stopped
+    /// Done: つないだ画像を保存する。`reason` は done（バー）・enter・hotkey・menu_bar・limit・stream_stopped
     func finish(reason: String) {
         switch state {
         case .starting:
@@ -144,6 +150,8 @@ final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
     private func end(save: Bool, reason: String) {
         state = .finishing
         overlay.hide()
+        enterTokens.forEach(HotKeyCenter.shared.unregister)
+        enterTokens = []
         let stream = stream
         self.stream = nil
         let after = { [self] in
