@@ -13,6 +13,13 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 ```markdown
 ## [Unreleased]
 
+### 🐛 Fixed
+- オールインワンで範囲の内側をドラッグしても範囲が動かず、クリックが下のアプリに届いていたのを修正
+- オールインワンのツールバーの上でカーソルが十字のままだったのを修正（矢印にする）
+
+### 🗑️ Removed
+- オールインワンの Timer ボタン
+
 ### ✨ Added
 - メニューに「アップデートを確認…」を追加
 
