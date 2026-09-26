@@ -37,8 +37,8 @@ enum FullScreenCapturer {
         }
     }
 
-    /// DPI を 72×scale にしておく（screencapture の出力と同じく、プレビュー等でポイントサイズで開く）
-    private static func writePNG(_ image: CGImage, scale: CGFloat, to url: URL) -> Bool {
+    /// DPI を 72×scale にしておく（screencapture の出力と同じく、プレビュー等でポイントサイズで開く）。スクロールキャプチャの出力でも使う
+    static func writePNG(_ image: CGImage, scale: CGFloat, to url: URL) -> Bool {
         guard let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else { return false }
         let dpi = 72 * scale
         CGImageDestinationAddImage(dest, image, [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)

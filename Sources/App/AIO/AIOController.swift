@@ -8,10 +8,11 @@ final class AIOPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// オールインワン（⌘⇧5）。マウスのあるディスプレイに暗幕を出して範囲を選ばせ、Capture / Recording をその範囲に行う。
-/// ⌘⇧5 の振り分け（録画・カウントダウン・暗幕の開閉）もここで行う
+/// オールインワン（⌘⇧5）。マウスのあるディスプレイに暗幕を出して範囲を選ばせ、Capture / Scrolling / Recording をその範囲に行う。
+/// ⌘⇧5 の振り分け（録画・カウントダウン・スクロールキャプチャ・暗幕の開閉）もここで行う
 final class AIOController {
     private let recorder: Recorder
+    private let scroller: ScrollCapturer
 
     private var panel: AIOPanel?
     private var selectionView: AIOSelectionView?
@@ -29,11 +30,12 @@ final class AIOController {
     var onCapture: ((NSScreen, CGRect, String?) -> Void)?
 
     var isOpen: Bool { panel != nil }
-    /// 暗幕が出ている（ほかの撮影のホットキーを無視する）
-    var isBusy: Bool { isOpen }
+    /// 暗幕が出ている・スクロールキャプチャ中（ほかの撮影のホットキーを無視する。範囲選択の UI がコマに写り込むため）
+    var isBusy: Bool { isOpen || scroller.isActive }
 
-    init(recorder: Recorder) {
+    init(recorder: Recorder, scroller: ScrollCapturer) {
         self.recorder = recorder
+        self.scroller = scroller
         model.onAction = { [weak self] in self?.perform($0) }
         model.onSizeEntered = { [weak self] w, h in self?.applySize(width: w, height: h) }
         model.onEditEnded = { [weak self] in
@@ -42,10 +44,13 @@ final class AIOController {
         }
     }
 
-    /// ⌘⇧5: 録画中・録画のカウントダウン中 → 停止／キャンセル、暗幕が出ている → 閉じる、どれでもない → 開く
+    /// ⌘⇧5: 録画中・録画のカウントダウン中 → 停止／キャンセル、スクロールキャプチャ中（開始待ちを含む）→ Done、
+    /// 暗幕が出ている → 閉じる、どれでもない → 開く
     func toggle() {
         if recorder.state != .idle {
             recorder.toggle()
+        } else if scroller.isActive {
+            scroller.finish(reason: "hotkey")
         } else if isOpen {
             close(reason: "toggle")
         } else {
@@ -135,7 +140,6 @@ final class AIOController {
     private func perform(_ action: AIOAction) {
         guard let v = selectionView, let local = v.selection else { return }
         Log.write("aio.action kind=\(action.rawValue)")
-        if action == .scrolling { return } // 今後の機能の場所取り
         let rect = AIOLayout.topLeft(local, boundsHeight: v.bounds.height)
         let screen = screen, app = app
         LastRegion.save(LastRegion(displayID: screen.displayID, rect: rect))
@@ -146,7 +150,7 @@ final class AIOController {
         case .record:
             recorder.start(screen: screen, rect: rect, app: app)
         case .scrolling:
-            break
+            scroller.start(screen: screen, rect: rect, app: app)
         }
     }
 

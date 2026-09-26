@@ -19,13 +19,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         rebuild(menu)
         refreshIcon()
         app.capture.recorder.onStateChange = { [weak self] in self?.refreshRecording() }
+        app.capture.scroller.onStateChange = { [weak self] in self?.refreshRecording() }
         Log.write("menu.installed")
     }
 
-    /// 録画中はアイコンを赤い ● と経過時間に変え、クリックで停止する（メニューは出さない）
+    /// 録画中・スクロールキャプチャ中はアイコンを赤い ● と経過時間に変え、クリックで停止（スクロールキャプチャは Done）する（メニューは出さない）
     private func refreshRecording() {
-        let recorder = app.capture.recorder
-        if recorder.state == .recording {
+        if app.capture.recorder.state == .recording || app.capture.scroller.state == .capturing {
             statusItem.menu = nil
             statusItem.length = NSStatusItem.variableLength
             statusItem.button?.image = nil
@@ -47,14 +47,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func updateElapsed() {
-        let seconds = app.capture.recorder.startedAt.map { Date().timeIntervalSince($0) } ?? 0
+        let started = app.capture.scroller.state == .capturing ? app.capture.scroller.startedAt : app.capture.recorder.startedAt
+        let seconds = started.map { Date().timeIntervalSince($0) } ?? 0
         let title = NSMutableAttributedString(string: "● ", attributes: [.foregroundColor: NSColor.systemRed])
         title.append(NSAttributedString(string: RecordingFormat.elapsed(seconds),
                                         attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)]))
         statusItem.button?.attributedTitle = title
     }
 
-    @objc private func stopRecording(_ sender: Any?) { app.capture.recorder.stop(reason: "menu_bar") }
+    @objc private func stopRecording(_ sender: Any?) {
+        if app.capture.scroller.state == .capturing {
+            app.capture.scroller.finish(reason: "menu_bar")
+        } else {
+            app.capture.recorder.stop(reason: "menu_bar")
+        }
+    }
 
     /// ホットキーの登録失敗・CleanShot X の起動中は警告アイコンにする
     private func refreshIcon() {

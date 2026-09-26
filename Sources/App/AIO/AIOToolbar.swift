@@ -24,7 +24,7 @@ struct AIOToolbar: View {
         HStack(spacing: 10) {
             HStack(spacing: 2) {
                 AIOToolButton(title: "Capture", symbol: "viewfinder") { model.onAction?(.capture) }
-                AIOToolButton(title: "Scrolling", symbol: "arrow.down", help: "準備中") { model.onAction?(.scrolling) }
+                AIOToolButton(title: "Scrolling", symbol: "arrow.down", help: "スクロールしながら縦に長く撮る") { model.onAction?(.scrolling) }
                 Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: 38).padding(.horizontal, 4)
                 AIOToolButton(title: "Recording", symbol: "video") { model.onAction?(.record) }
             }

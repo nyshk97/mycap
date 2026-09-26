@@ -5,7 +5,7 @@
 ```bash
 mise run build          # Debug（mycap Dev）。署名 xcconfig が無ければ ad-hoc で通る
 mise run build-release  # Release（mycap）
-mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ・注釈（矢印・四角・モザイク・文字）の描画の画素と当たり判定・取り消し）
+mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ・注釈（矢印・四角・モザイク・文字）の描画の画素と当たり判定・取り消し・スクロールキャプチャのつなぎ（固定ヘッダ・フッタ、上へのスクロール、スクロールバー、周期的な中身、高さの上限）とプレビューの置き場所）
 mise run run            # /Applications/mycap Dev.app に置いて起動し直す（旧プロセスの終了を待つ）
 ```
 
@@ -26,6 +26,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
 `aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= rect=` / `record.bar_shown placement=below|above|inside frame=` /
+`scroll.started rect= px= scale=` / `scroll.overlay bar= preview=right|left|inside frame=` / `scroll.frame kind=first|appended|limit|upward|weak|ambiguous|size dy= score= accepted= height=`（変化なしのコマは出さない）/ `scroll.end_pending` / `scroll.finished reason=done|hotkey|menu_bar|limit|cancel|stream_stopped|no_frame|test height= frames=` / `capture.scrolling.captured` /
 `video.opened mode=preview|trim name= size= window=` / `video.trimmed name= start= end=` / `video.trim_unchanged` / `video.trim_cancelled` / `video.trim_failed` / `video.closed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
@@ -71,6 +72,13 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --aio-record 200 150 333 211 3  # カウントダウンを飛ばして範囲を 3 秒録る（許可が要る）→ record.started size=332x210（RecordingFormat.outputSize）
 ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 ~/Library/Caches/mycap-dev/<録れた名前>.mp4
 # 録画中の赤い枠は範囲の外側なので写らない（ffmpeg -ss 1.5 -i <mp4> -frames:v 1 で 1 コマ抜いて見る）
+# スクロールキャプチャ。--scroll-frames は許可なしで、連番 PNG（名前順）をコマとして流す。
+python3 scripts/make_scroll_fixture.py $S/scroll   # 縦長のページから固定ヘッダ付きの窓をずらして切り出したコマ（同じコマ・上へ戻すコマも混ぜる）と期待画像
+"${B[@]}" --scroll-frames $S/scroll/frames   # scroll.frame kind=appended/upward … → scroll.finished reason=test height=1600 → capture.scrolling.captured px=800x1600
+swift scripts/png_diff.swift ~/Library/Caches/mycap-dev/<撮れた名前>.png $S/scroll/expected.png   # maxdiff=0。DPI は 72×画面の scale（sips -g dpiHeight）
+"${B[@]}" --scroll-overlay-snapshot 300 150 600 500 $S/ov.png     # 撮影中の枠・バー・プレビューの配置（placement=right）
+"${B[@]}" --scroll-overlay-snapshot 0 0 2560 1440 $S/ov-in.png    # 画面いっぱい → バーは内側の右下、プレビューはその上で止まる（placement=inside）
+"${B[@]}" --scroll-capture 100 100 500 400 2.5   # 実際の SCStream で 2.5 秒撮って Done（許可が要る。枠・バーが画面に出る）→ 手でスクロールしなければ最初の 1 コマ（1000x800・Display P3）
 # 録画中の停止バー: 範囲の右下の外 → 右上の外 → 範囲の内側の右下（record.bar_shown placement=）。■ を押したのと同じ経路で止める → record.captured reason=bar
 "${B[@]}" --record-bar-snapshot $S/bar.png                                   # バーだけを描く（経過時間は 0:12 固定）
 "${B[@]}" --aio-record 0 0 2560 1440 30; sleep 5; screencapture -x -D 2 $S/screen.png; "${B[@]}" --record-stop-bar

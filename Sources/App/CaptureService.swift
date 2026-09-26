@@ -7,8 +7,9 @@ final class CaptureService {
     let editor = EditorController()
     let video = VideoWindowController()
     let recorder = Recorder()
+    let scroller = ScrollCapturer()
     let history = HistoryController()
-    private(set) lazy var aio = AIOController(recorder: recorder)
+    private(set) lazy var aio = AIOController(recorder: recorder, scroller: scroller)
 
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
@@ -35,12 +36,13 @@ final class CaptureService {
         }
         aio.onClosed = { [weak self] in self?.thumbnails.setHidden(false) }
         aio.onCapture = { [weak self] screen, rect, app in self?.captureArea(screen: screen, rect: rect, app: app, kind: "aio") }
+        scroller.onSaved = { [weak self] tmp, screen, app in self?.finish(tmp: tmp, kind: "scrolling", screen: screen, app: app) }
     }
     private let capturer = ScreenCapturer()
     private let drag = DragTracker()
     private var fullScreenRunning = false
 
-    /// オールインワンの暗幕・タイマーが出ている間は、ほかの撮影のホットキーを受けない（暗幕の上に選択 UI が重なるため）
+    /// オールインワンの暗幕が出ている間・スクロールキャプチャ中は、ほかの撮影のホットキーを受けない（暗幕の上に選択 UI が重なる・コマに写り込むため）
     func isBlockedByAIO(_ what: String) -> Bool {
         guard aio.isBusy else { return false }
         Log.write("capture.ignored mode=\(what) reason=aio")

@@ -181,6 +181,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--aio-capture <x> <y> <w> <h>`: オールインワンで範囲を選んで Capture した後の経路（マウスのある画面・左上原点のポイント。許可が要る）
     /// `--aio-record <x> <y> <w> <h> <秒>`: カウントダウンを飛ばして、その範囲を指定秒数だけ録る（許可が要る）
     /// `--aio-snapshot <x> <y> <w> <h> <png>`: その範囲を選んだ状態の暗幕とツールバーを、画面に出さずに PNG に描く
+    /// `--scroll-frames <dir>`: 連番 PNG（名前順）をスクロールキャプチャのコマとして流し、つないだものをサムネイルに出す（許可が要らない）
+    /// `--scroll-capture <x> <y> <w> <h> <秒>`: その範囲のスクロールキャプチャを始め、指定秒数のあと Done する（許可が要る。枠とバーが画面に出る）
+    /// `--scroll-overlay-snapshot <x> <y> <w> <h> <png>`: その範囲をスクロールキャプチャ中の枠・バー・プレビューの配置を、画面に出さずに PNG に描く
     /// `--record-bar-snapshot <png>`: 録画中の停止バーを、画面に出さずに PNG に描く
     /// `--record-stop-bar`: 録画中なら停止バーの ■ を押したのと同じ経路で止める（record.captured reason=bar）
     /// `--video-open <preview|trim>`: 最新のサムネイルの録画をプレビュー／トリムのウィンドウで開く（アクティブにしない）/ `--video-dump` / `--video-close`
@@ -278,6 +281,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let r = rectArg() {
                     let path = arg() ?? "/tmp/mycap-aio.png"
                     Log.write("hook.aio_snapshot path=\(path) ok=\(capture.aio.snapshot(rect: r, to: path))")
+                }
+            case "--scroll-frames":
+                if let dir = arg() { capture.scroller.stitchFiles(in: dir) }
+            case "--scroll-capture":
+                if let r = rectArg(), let sec = arg().flatMap(Double.init) {
+                    capture.scroller.start(screen: .underMouse, rect: r, app: CaptureStore.frontmostAppID())
+                    DispatchQueue.main.asyncAfter(deadline: .now() + sec) { self.capture.scroller.finish(reason: "test") }
+                }
+            case "--scroll-overlay-snapshot":
+                if let r = rectArg() {
+                    let path = arg() ?? "/tmp/mycap-scroll-overlay.png"
+                    Log.write("hook.scroll_overlay_snapshot path=\(path) ok=\(ScrollOverlay.snapshot(rect: r, screen: .underMouse, to: path))")
                 }
             case "--record-bar-snapshot":
                 let path = arg() ?? "/tmp/mycap-record-bar.png"
