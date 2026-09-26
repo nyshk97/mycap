@@ -113,7 +113,18 @@ final class ThumbnailView: NSView, NSDraggingSource {
         }
         let dim = NSView(frame: bounds)
         dim.wantsLayer = true
-        dim.layer?.backgroundColor = NSColor(white: 0, alpha: isVideo ? 0.25 : 0.45).cgColor
+        if isVideo {
+            // 録画は上下（ボタンのある所）だけ暗くして、真ん中の映像を見せる
+            let gradient = CAGradientLayer()
+            let edge = NSColor(white: 0, alpha: 0.35).cgColor, clear = NSColor(white: 0, alpha: 0.05).cgColor
+            gradient.colors = [edge, clear, clear, edge]
+            gradient.locations = [0, 0.4, 0.6, 1]
+            gradient.frame = bounds
+            gradient.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+            dim.layer?.addSublayer(gradient)
+        } else {
+            dim.layer?.backgroundColor = NSColor(calibratedRed: 0.04, green: 0.05, blue: 0.06, alpha: 0.38).cgColor
+        }
         dim.autoresizingMask = [.width, .height]
         overlay.addSubview(dim)
         addSubview(overlay)
@@ -130,7 +141,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
     /// 四隅に丸ボタン（左上 閉じる・右上 ピン・左下 編集・右下 OCR）、中央に Copy / Save。
     /// 録画は 左上 閉じる・右上 プレビュー・左下 トリム・右下 コピー、中央に Save だけ
     private func buildButtons() {
-        let inset: CGFloat = 7
+        let inset: CGFloat = 8
         let d = CircleButton.diameter
         func corner(_ button: NSButton, left: Bool, top: Bool) {
             button.frame.origin = NSPoint(x: left ? inset : bounds.width - inset - d,
@@ -153,7 +164,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
         let pills = isVideo ? [save] : [PillButton("Copy", tip: "コピー（⌘C）") { [weak self] in self?.actions.copy() }, save]
         let column = NSStackView(views: pills)
         column.orientation = .vertical
-        column.spacing = 6
+        column.spacing = 7
         column.translatesAutoresizingMaskIntoConstraints = false
         overlay.addSubview(column)
         NSLayoutConstraint.activate([
@@ -162,11 +173,11 @@ final class ThumbnailView: NSView, NSDraggingSource {
         ])
     }
 
-    /// ホバー時の背景。表示の大きさで 6pt 相当のぼかしになるよう、画像のピクセル幅に合わせて半径を決める
+    /// ホバー時の背景。表示の大きさで 8pt 相当のぼかしになるよう、画像のピクセル幅に合わせて半径を決める
     private static func blurred(_ image: NSImage, displayWidth: CGFloat) -> NSImage? {
         guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         let input = CIImage(cgImage: cg)
-        let radius = 6 * CGFloat(cg.width) / max(displayWidth, 1)
+        let radius = 8 * CGFloat(cg.width) / max(displayWidth, 1)
         guard let filter = CIFilter(name: "CIGaussianBlur") else { return nil }
         filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
         filter.setValue(radius, forKey: kCIInputRadiusKey)
@@ -419,11 +430,11 @@ final class ThumbnailView: NSView, NSDraggingSource {
 }
 
 /// クロージャで押下を受けるボタン。非アクティブなパネルでも 1 回目のクリックで押せるようにする。
-/// 薄いグレーの面に黒い中身。乗ると白く、押すと暗くなる
+/// 半透明の黒に白い中身と 0.5pt の白い縁（ダークガラス）。どんな色のスクショの上でも沈まない。乗ると白く明るく、押すと暗くなる
 class ActionButton: NSButton {
-    private static let fill = NSColor(white: 0.9, alpha: 0.95)
-    private static let hoverFill = NSColor(white: 1, alpha: 1)
-    private static let pressedFill = NSColor(white: 0.75, alpha: 0.95)
+    private static let fill = NSColor(calibratedRed: 0.12, green: 0.125, blue: 0.15, alpha: 0.6)
+    private static let hoverFill = NSColor(white: 1, alpha: 0.3)
+    private static let pressedFill = NSColor(white: 0, alpha: 0.7)
 
     var onPress: (() -> Void)?
 
@@ -433,7 +444,16 @@ class ActionButton: NSButton {
         wantsLayer = true
         layer?.cornerRadius = min(size.width, size.height) / 2
         layer?.backgroundColor = Self.fill.cgColor
-        contentTintColor = .black
+        layer?.borderWidth = 0.5
+        layer?.borderColor = NSColor(white: 1, alpha: 0.3).cgColor
+        shadow = {
+            let s = NSShadow()
+            s.shadowColor = NSColor(white: 0, alpha: 0.3)
+            s.shadowOffset = NSSize(width: 0, height: -1)
+            s.shadowBlurRadius = 3
+            return s
+        }()
+        contentTintColor = .white
         toolTip = tip
         onPress = action
         target = self
@@ -473,29 +493,26 @@ final class CircleButton: ActionButton {
     init(_ symbol: String, tip: String, action: @escaping () -> Void) {
         super.init(size: NSSize(width: Self.diameter, height: Self.diameter), tip: tip, action: action)
         image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)?
-            .withSymbolConfiguration(.init(pointSize: 12, weight: .bold))
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
         imagePosition = .imageOnly
     }
 
     required init?(coder: NSCoder) { fatalError() }
 }
 
-/// 中央の Copy / Save。文字幅に合わせた横長の角丸
+/// 中央の Copy / Save。文字幅なりの横長の角丸（最小幅はそろえる）
 private final class PillButton: ActionButton {
-    private static let font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+    private static let font = NSFont.systemFont(ofSize: 13, weight: .semibold)
     private static let height: CGFloat = 28
-    private static let width: CGFloat = 70
+    private static let minWidth: CGFloat = 64
 
     init(_ label: String, tip: String, action: @escaping () -> Void) {
-        super.init(size: NSSize(width: Self.width, height: Self.height), tip: tip, action: action)
-        setLabel(label)
+        let textWidth = (label as NSString).size(withAttributes: [.font: Self.font]).width
+        super.init(size: NSSize(width: max(Self.minWidth, ceil(textWidth) + 32), height: Self.height), tip: tip, action: action)
+        attributedTitle = NSAttributedString(string: label, attributes: [
+            .font: Self.font, .foregroundColor: NSColor.white,
+        ])
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    private func setLabel(_ label: String) {
-        attributedTitle = NSAttributedString(string: label, attributes: [
-            .font: Self.font, .foregroundColor: NSColor.black,
-        ])
-    }
 }
