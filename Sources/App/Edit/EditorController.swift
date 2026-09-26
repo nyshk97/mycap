@@ -6,6 +6,8 @@ final class EditorController: NSObject, NSWindowDelegate {
     private var window: EditorWindow?
     private var model: EditorModel?
     private var canvas: EditorCanvas?
+    /// NSToolbar の delegate は弱参照なので持っておく
+    private var toolbar: EditorToolbar?
     /// 開く前に前面だったアプリ（閉じたら戻す）
     private var previousApp: NSRunningApplication?
     /// 保存した（元の画像, 書き出した画像）を受け取る
@@ -38,23 +40,22 @@ final class EditorController: NSObject, NSWindowDelegate {
                                     visible: screen.size)
         let w = EditorWindow(contentRect: NSRect(origin: .zero, size: size),
                              styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        // タイトルは出さずにツールバーと 1 段にする（Mission Control 等のためにタイトル自体は持つ）
         w.title = "編集 — \(url.lastPathComponent)"
+        w.titleVisibility = .hidden
+        w.toolbarStyle = .unified
+        let toolbar = EditorToolbar(model: model)
+        w.toolbar = toolbar.toolbar
+        self.toolbar = toolbar
         w.isReleasedWhenClosed = false
         w.level = .floating
         w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        w.minSize = NSSize(width: 900, height: 320)
+        w.minSize = NSSize(width: 640, height: 320)
         w.delegate = self
         w.editor = self
 
-        let content = NSView(frame: NSRect(origin: .zero, size: size))
-        let toolbar = NSHostingView(rootView: EditorToolbar(model: model))
-        toolbar.frame = NSRect(x: 0, y: size.height - EditorToolbar.height, width: size.width, height: EditorToolbar.height)
-        toolbar.autoresizingMask = [.width, .minYMargin]
-        canvas.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height - EditorToolbar.height)
-        canvas.autoresizingMask = [.width, .height]
-        content.addSubview(canvas)
-        content.addSubview(toolbar)
-        w.contentView = content
+        canvas.frame = NSRect(origin: .zero, size: size)
+        w.contentView = canvas
         w.setFrameOrigin(NSPoint(x: screen.midX - w.frame.width / 2, y: screen.midY - w.frame.height / 2))
         window = w
 
@@ -74,8 +75,8 @@ final class EditorController: NSObject, NSWindowDelegate {
         let margin: CGFloat = 32
         let maxW = visible.width * 0.9, maxH = visible.height * 0.9 - EditorToolbar.height
         let s = min(1, (maxW - margin) / imagePoints.width, (maxH - margin) / imagePoints.height)
-        let w = max(900, imagePoints.width * s + margin)
-        let h = max(320, imagePoints.height * s + margin + EditorToolbar.height)
+        let w = max(640, imagePoints.width * s + margin)
+        let h = max(320, imagePoints.height * s + margin)
         return NSSize(width: min(w, visible.width), height: min(h, visible.height))
     }
 
@@ -108,6 +109,7 @@ final class EditorController: NSObject, NSWindowDelegate {
         self.window = nil
         model = nil
         canvas = nil
+        toolbar = nil
         if wasKey, let app = previousApp, app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             app.activate()
         }
