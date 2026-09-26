@@ -22,8 +22,8 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
-`ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=esc|double_click|menu` / `pin.closed` / `pin.opacity` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
+`ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
@@ -59,6 +59,9 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）
 "${B[@]}" --pin "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-pins --close-pins
+# サムネイルからピン留め → サムネイルは閉じる（thumbnail.closed reason=pinned）。× はホバー中だけ出る（close_button=hidden → shown）
+"${B[@]}" --ingest $S/fx/wide.png --pin-newest --dump-thumbs --dump-pins --hover-pins --dump-pins --close-pins
+# Esc・ダブルクリックでは閉じない（× とメニューの「閉じる」だけ）のは、クリックが要るので人間が確かめる
 # 編集（注釈は [Annotation] の JSON。座標は画像のピクセル・左上原点。end / color / text / font は省略可）
 cat > $S/ann.json <<'J'
 [{"kind":"rect","start":[80,60],"end":[900,260],"size":8},

@@ -149,6 +149,8 @@ final class ThumbnailView: NSView, NSDraggingSource {
 
     /// 検証フックの `--save-newest` 用
     func pressSave() { actions.save() }
+    /// 検証フックの `--pin-newest` 用
+    func pressPin() { actions.pin() }
 
     // MARK: - ホバー
 
@@ -242,7 +244,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
 
 /// クロージャで押下を受けるボタン。非アクティブなパネルでも 1 回目のクリックで押せるようにする。
 /// 薄いグレーの面に黒い中身。乗ると白く、押すと暗くなる
-private class ActionButton: NSButton {
+class ActionButton: NSButton {
     private static let fill = NSColor(white: 0.9, alpha: 0.95)
     private static let hoverFill = NSColor(white: 1, alpha: 1)
     private static let pressedFill = NSColor(white: 0.75, alpha: 0.95)
@@ -288,8 +290,8 @@ private class ActionButton: NSButton {
     }
 }
 
-/// 四隅の丸いアイコンボタン
-private final class CircleButton: ActionButton {
+/// 四隅の丸いアイコンボタン（ピンの閉じるボタンにも使う）
+final class CircleButton: ActionButton {
     static let diameter: CGFloat = 26
 
     init(_ symbol: String, tip: String, action: @escaping () -> Void) {

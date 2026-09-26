@@ -198,6 +198,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.write("hook.thumbs count=\(capture.thumbnails.count) items=\(capture.thumbnails.dump())")
             case "--save-newest":
                 capture.thumbnails.saveNewest()
+            case "--pin-newest":
+                capture.thumbnails.pinNewest()
+            case "--hover-pins":
+                capture.pins.setHovered(true)
             case "--hover":
                 capture.thumbnails.hoverNewest(true)
             case "--unhover":

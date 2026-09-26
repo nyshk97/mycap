@@ -36,6 +36,11 @@ final class PinController {
     // MARK: - 検証フック用
 
     func dump() -> [String] {
-        panels.map { "\($0.url.lastPathComponent) frame=\(NSStringFromRect($0.frame)) alpha=\($0.alphaValue)" }
+        panels.map { "\($0.url.lastPathComponent) frame=\(NSStringFromRect($0.frame)) alpha=\($0.alphaValue) close_button=\($0.isCloseButtonShown ? "shown" : "hidden")" }
+    }
+
+    /// 閉じるボタンの出し入れ（マウスを動かさずに確かめる）
+    func setHovered(_ on: Bool) {
+        panels.forEach { $0.setHovered(on) }
     }
 }

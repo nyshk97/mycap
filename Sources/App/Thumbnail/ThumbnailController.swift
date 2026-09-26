@@ -105,7 +105,11 @@ final class ThumbnailController {
                 Toast.shared.show("保存しました: \(saved.lastPathComponent)", near: panel.frame)
                 self?.close(panel, reason: "saved")
             },
-            pin: { [weak self] in self?.onPin?(url) },
+            pin: { [weak self] in
+                // ピンに出したらサムネイルは要らない
+                self?.onPin?(url)
+                self?.close(panel, reason: "pinned")
+            },
             ocr: { [weak self] in
                 // 認識はキャッシュのファイルから非同期に行うので、先に閉じてよい（結果はトーストで出る）
                 OCR.recognizeAndCopy(url: url, source: "thumbnail", near: panel.frame)
@@ -185,6 +189,11 @@ final class ThumbnailController {
     /// 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えて使う）
     func saveNewest() {
         items.first?.panel.thumbnailView.pressSave()
+    }
+
+    /// 最新のサムネイルの「ピン留め」を押す
+    func pinNewest() {
+        items.first?.panel.thumbnailView.pressPin()
     }
 
     func hoverNewest(_ on: Bool) {

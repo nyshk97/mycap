@@ -1,7 +1,8 @@
 import AppKit
 
 /// 最前面に浮かぶ画像 1 枚。全 Space・フルスクリーンの上にも出る。
-/// クリックで key になり（アプリはアクティブにしない）、⌘C でコピー・Esc で閉じる。縁と角のドラッグで拡大縮小する
+/// クリックで key になり（アプリはアクティブにしない）、⌘C でコピーする。縁と角のドラッグで拡大縮小する。
+/// うっかり消さないよう、閉じるのはホバーで出る左上の × と右クリックメニューだけ（Esc・ダブルクリックでは閉じない）
 final class PinPanel: NSPanel {
     let url: URL
     private let image: NSImage
@@ -39,13 +40,8 @@ final class PinPanel: NSPanel {
 
     func copyImage() { ImageClipboard.copy(url) }
 
-    override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { // Esc
-            close(reason: "esc")
-        } else {
-            super.keyDown(with: event)
-        }
-    }
+    var isCloseButtonShown: Bool { (contentView as? PinView)?.isCloseButtonShown ?? false }
+    func setHovered(_ on: Bool) { (contentView as? PinView)?.setHovered(on) }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -55,14 +51,11 @@ final class PinPanel: NSPanel {
         }
         return super.performKeyEquivalent(with: event)
     }
-
-    override func cancelOperation(_ sender: Any?) {
-        close(reason: "esc")
-    }
 }
 
 private final class PinView: NSView {
     weak var panel: PinPanel?
+    private var closeButton: CircleButton!
 
     init(frame: NSRect, image: NSImage) {
         super.init(frame: frame)
@@ -74,6 +67,13 @@ private final class PinView: NSView {
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.autoresizingMask = [.width, .height]
         addSubview(imageView)
+
+        let d = CircleButton.diameter
+        closeButton = CircleButton("xmark", tip: "閉じる") { [weak self] in self?.panel?.close(reason: "button") }
+        closeButton.frame.origin = NSPoint(x: 6, y: bounds.height - 6 - d)
+        closeButton.autoresizingMask = [.maxXMargin, .minYMargin]
+        closeButton.isHidden = true
+        addSubview(closeButton)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -83,12 +83,23 @@ private final class PinView: NSView {
     override func mouseDown(with event: NSEvent) {
         guard let panel else { return }
         panel.makeKey()
-        if event.clickCount == 2 {
-            panel.close(reason: "double_click")
-        } else {
-            panel.performDrag(with: event)
-        }
+        panel.performDrag(with: event)
     }
+
+    // MARK: - ホバーで × を出す
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) { setHovered(true) }
+    override func mouseExited(with event: NSEvent) { setHovered(false) }
+
+    var isCloseButtonShown: Bool { !closeButton.isHidden }
+    func setHovered(_ on: Bool) { closeButton.isHidden = !on }
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
