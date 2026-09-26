@@ -51,7 +51,8 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private let isVideo: Bool
     private let overlay = NSView()
     private var mouseDownPoint: NSPoint?
-    private var escToken: UInt32?
+    /// ホバー中だけ取っているキー（Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P）の登録 id
+    private var keyTokens: [UInt32] = []
     private(set) var isHovered = false
     /// 「保存」を押して ~/Downloads に書いた先。保存後は Save が「Finder」（Finder で表示）に変わる
     private(set) var savedURL: URL?
@@ -110,14 +111,14 @@ final class ThumbnailView: NSView, NSDraggingSource {
         }
         corner(CircleButton("xmark", tip: "閉じる（Esc）") { [weak self] in self?.actions.close() }, left: true, top: true)
         if !isVideo {
-            corner(CircleButton("pin.fill", tip: "ピン留め") { [weak self] in self?.actions.pin() }, left: false, top: true)
-            corner(CircleButton("pencil", tip: "整形（背景と余白）") { [weak self] in self?.actions.style() }, left: true, top: false)
-            corner(CircleButton("text.viewfinder", tip: "OCR（文字をコピー）") { [weak self] in self?.actions.ocr() }, left: false, top: false)
+            corner(CircleButton("pin.fill", tip: "ピン留め（⌘P）") { [weak self] in self?.actions.pin() }, left: false, top: true)
+            corner(CircleButton("pencil", tip: "整形（背景と余白）（⌘E）") { [weak self] in self?.actions.style() }, left: true, top: false)
+            corner(CircleButton("text.viewfinder", tip: "OCR（文字をコピー）（⌘O）") { [weak self] in self?.actions.ocr() }, left: false, top: false)
         }
 
-        let save = PillButton("Save", tip: "保存（~/Downloads）") { [weak self] in self?.pressSave() }
+        let save = PillButton("Save", tip: "保存（~/Downloads）（⌘S）") { [weak self] in self?.pressSave() }
         saveButton = save
-        let pills = isVideo ? [save] : [PillButton("Copy", tip: "コピー") { [weak self] in self?.actions.copy() }, save]
+        let pills = isVideo ? [save] : [PillButton("Copy", tip: "コピー（⌘C）") { [weak self] in self?.actions.copy() }, save]
         let column = NSStackView(views: pills)
         column.orientation = .vertical
         column.spacing = 6
@@ -175,23 +176,48 @@ final class ThumbnailView: NSView, NSDraggingSource {
     override func mouseEntered(with event: NSEvent) { setHovered(true) }
     override func mouseExited(with event: NSEvent) { setHovered(false) }
 
-    /// ホバー中だけ Esc をホットキーとして取る（キー監視のアクセシビリティ許可を要らなくするため）。
-    /// `grabEsc: false` は検証フックでボタンの見た目だけ撮るとき
-    func setHovered(_ hovered: Bool, grabEsc: Bool = true) {
+    /// ホバー中だけ Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P をホットキーとして取る（キー監視のアクセシビリティ許可を要らなくするため）。
+    /// ホバーしていない間は登録しないので、前面のアプリの ⌘C 等はそのまま効く。
+    /// `grabKeys: false` は検証フックでボタンの見た目だけ撮るとき
+    func setHovered(_ hovered: Bool, grabKeys: Bool = true) {
         isHovered = hovered
         overlay.isHidden = !hovered
-        if hovered, grabEsc, escToken == nil {
-            escToken = HotKeyCenter.shared.registerToken(keyCode: kVK_Escape, modifiers: 0) { [weak self] in
-                self?.actions.close()
-            }.id
-        } else if !hovered, let token = escToken {
-            HotKeyCenter.shared.unregister(token)
-            escToken = nil
+        if hovered, grabKeys, keyTokens.isEmpty {
+            registerHoverKeys()
+        } else if !hovered {
+            keyTokens.forEach(HotKeyCenter.shared.unregister)
+            keyTokens.removeAll()
         }
     }
 
-    /// 閉じるときに Esc を必ず手放す（ホバー中に閉じると mouseExited が来ない）
-    func releaseEsc() {
+    private func registerHoverKeys() {
+        var keys: [(code: Int, mods: Int, name: String, run: () -> Void)] = [
+            (kVK_Escape, 0, "esc", { [weak self] in self?.actions.close() }),
+            (kVK_ANSI_S, cmdKey, "cmd_s", { [weak self] in self?.pressSave() }),
+        ]
+        if !isVideo {
+            keys += [
+                (kVK_ANSI_C, cmdKey, "cmd_c", { [weak self] in self?.actions.copy() }),
+                (kVK_ANSI_O, cmdKey, "cmd_o", { [weak self] in self?.actions.ocr() }),
+                (kVK_ANSI_E, cmdKey, "cmd_e", { [weak self] in self?.actions.style() }),
+                (kVK_ANSI_P, cmdKey, "cmd_p", { [weak self] in self?.actions.pin() }),
+            ]
+        }
+        for key in keys {
+            let result = HotKeyCenter.shared.registerToken(keyCode: key.code, modifiers: key.mods) { [name = key.name, run = key.run] in
+                Log.write("thumbnail.key key=\(name)")
+                run()
+            }
+            if let id = result.id {
+                keyTokens.append(id)
+            } else {
+                Log.write("thumbnail.key_register_failed key=\(key.name) status=\(result.status)")
+            }
+        }
+    }
+
+    /// 閉じるときにキーを必ず手放す（ホバー中に閉じると mouseExited が来ない）
+    func releaseKeys() {
         setHovered(false)
     }
 

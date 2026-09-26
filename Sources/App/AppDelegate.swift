@@ -159,7 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--last-region`: 前回と同じ範囲を撮る（選択 UI が出ないのでフックにできる。許可が要る）
     /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
     /// `--save-newest`: 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えてから）
-    /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
+    /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc・⌘C 等のキーは取らない）
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
     /// `--ocr <png>`: 文字を読んでログとトーストに出す（クリップボードには書かない）

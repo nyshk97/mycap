@@ -88,7 +88,7 @@ final class ThumbnailController {
 
     func close(_ panel: ThumbnailPanel, reason: String) {
         guard let index = items.firstIndex(where: { $0.panel === panel }) else { return }
-        panel.thumbnailView.releaseEsc()
+        panel.thumbnailView.releaseKeys()
         panel.orderOut(nil)
         items.remove(at: index)
         Log.write("thumbnail.closed name=\(panel.url.lastPathComponent) reason=\(reason) count=\(items.count)")
@@ -98,7 +98,7 @@ final class ThumbnailController {
     func closeAll() {
         let before = items.count
         for item in items {
-            item.panel.thumbnailView.releaseEsc()
+            item.panel.thumbnailView.releaseKeys()
             item.panel.orderOut(nil)
         }
         items.removeAll()
@@ -155,7 +155,7 @@ final class ThumbnailController {
     }
 
     func hoverNewest(_ on: Bool) {
-        items.first?.panel.thumbnailView.setHovered(on, grabEsc: false)
+        items.first?.panel.thumbnailView.setHovered(on, grabKeys: false)
     }
 
     /// 最新のサムネイルの中身をプロセス内描画で PNG にする（画面収録の許可は要らない）
