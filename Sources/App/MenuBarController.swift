@@ -84,9 +84,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let full = NSMenuItem(title: "全画面を撮る", action: #selector(captureFullScreen(_:)), keyEquivalent: "")
         full.target = self
         menu.addItem(full)
-        let record = NSMenuItem(title: "録画を開始（\(HotKeyBindings.record.label)）", action: #selector(toggleRecording(_:)), keyEquivalent: "")
-        record.target = self
-        menu.addItem(record)
+        let aio = NSMenuItem(title: "オールインワン（\(HotKeyBindings.allInOne.label)）", action: #selector(openAllInOne(_:)), keyEquivalent: "")
+        aio.target = self
+        menu.addItem(aio)
         let ocr = NSMenuItem(title: "文字を読む（OCR）", action: #selector(captureOCR(_:)), keyEquivalent: "")
         ocr.target = self
         menu.addItem(ocr)
@@ -149,8 +149,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func captureFullScreen(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureFullScreen() }
     }
-    @objc private func toggleRecording(_ sender: Any?) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.toggleRecording() }
+    @objc private func openAllInOne(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.toggleAllInOne() }
     }
     @objc private func captureOCR(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureOCR() }

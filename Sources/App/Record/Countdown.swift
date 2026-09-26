@@ -1,9 +1,16 @@
 import AppKit
 import Carbon
 
-/// 録画前の 3 秒のカウントダウン。画面中央に大きく出す。Esc（またはホットキーの再押下）でキャンセルできる。
-/// 録画はカウントダウンを閉じてから始めるので、この表示は録画に写らない
+/// 録画・タイマー撮影の前の 3 秒のカウントダウン。画面中央に大きく出す。Esc（またはホットキーの再押下）でキャンセルできる。
+/// 録画・撮影はカウントダウンを閉じてから始めるので、この表示は写らない
 final class Countdown {
+    /// ログの接頭辞（`record` / `timer`）
+    private let logPrefix: String
+
+    init(logPrefix: String) {
+        self.logPrefix = logPrefix
+    }
+
     private var panel: NSPanel?
     private var label: NSTextField?
     private var timer: Timer?
@@ -62,14 +69,14 @@ final class Countdown {
                 self?.label?.stringValue = "\(remaining)"
             }
         }
-        Log.write("record.countdown_started seconds=\(seconds) screen=\(screen.displayID)")
+        Log.write("\(logPrefix).countdown_started seconds=\(seconds) screen=\(screen.displayID)")
     }
 
     func cancel() {
         guard isRunning else { return }
         let cancelled = onCancel
         stop()
-        Log.write("record.countdown_cancelled")
+        Log.write("\(logPrefix).countdown_cancelled")
         cancelled?()
     }
 

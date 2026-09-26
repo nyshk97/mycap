@@ -2,11 +2,11 @@ import AppKit
 import AVFoundation
 import ScreenCaptureKit
 
-/// 動画録画。OS 標準の SCContentSharingPicker でディスプレイかウィンドウを選び、3 秒のカウントダウンのあと
+/// 動画録画。オールインワン（⌘⇧5）で選んだ範囲を、3 秒のカウントダウンのあと
 /// SCRecordingOutput で mp4（1x・H.264・30fps・カーソルあり）に書く。
-/// 同じホットキーで 選ぶ → （カウントダウン中ならキャンセル）→ 録画中なら停止 と進む
-final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate, SCRecordingOutputDelegate {
-    enum State: String { case idle, picking, countdown, recording, stopping }
+/// 録画中は範囲の外側に枠を出す（mycap のウィンドウはフィルタで外すうえ、枠は範囲の外なので写らない）
+final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
+    enum State: String { case idle, countdown, recording, stopping }
 
     private(set) var state: State = .idle { didSet { onStateChange?() } }
     private(set) var startedAt: Date?
@@ -15,123 +15,81 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
     /// 録れた mp4（キャッシュに置いたもの）を受け取る（サムネイルを出す）
     var onSaved: ((URL, NSScreen) -> Void)?
 
-    private let countdown = Countdown()
+    private let countdown = Countdown(logPrefix: "record")
+    private let frame = RecordingFrame()
     private var stream: SCStream?
     private var output: SCRecordingOutput?
     private var tmpURL: URL?
     private var targetScreen: NSScreen = .underMouse
     private var stopReason = "user"
-    /// 履歴のアイコン用。ウィンドウを録るならその持ち主、画面なら picker を出す前の前面アプリ
+    /// 履歴のアイコン用。オールインワンを開いたときの前面アプリ
     private var sourceApp: String?
 
-    /// ホットキー・メニューから
+    /// ⌘⇧5 の振り分け（`AIOController`）から: カウントダウン中ならキャンセル、録画中なら停止
     func toggle() {
         switch state {
-        case .idle: pick()
-        case .picking: Log.write("record.toggle_ignored state=picking")
+        case .idle: Log.write("record.toggle_ignored state=idle")
         case .countdown: countdown.cancel()
         case .recording: stop(reason: "user")
         case .stopping: break
         }
     }
 
-    // MARK: - 対象を選ぶ
-
-    private func pick() {
-        sourceApp = CaptureStore.frontmostAppID()
-        let picker = SCContentSharingPicker.shared
-        var config = SCContentSharingPickerConfiguration()
-        config.allowedPickerModes = [.singleWindow, .singleDisplay]
-        if let id = Bundle.main.bundleIdentifier { config.excludedBundleIDs = [id] }
-        picker.defaultConfiguration = config
-        picker.add(self)
-        picker.isActive = true
-        state = .picking
-        picker.present()
-        Log.write("record.picker_presented")
-    }
-
-    func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
-        DispatchQueue.main.async { self.picked(filter) }
-    }
-
-    func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
-        DispatchQueue.main.async {
-            Log.write("record.picker_cancelled")
-            self.finishPicker()
-            self.state = .idle
+    /// 範囲（ディスプレイ内の左上原点のポイント）を、カウントダウンのあと録る
+    func start(screen: NSScreen, rect: CGRect, app: String?) {
+        guard state == .idle else {
+            Log.write("record.start_ignored state=\(state.rawValue)")
+            return
         }
-    }
-
-    func contentSharingPickerStartDidFailWithError(_ error: Error) {
-        DispatchQueue.main.async {
-            Log.write("record.picker_failed error=\(error)")
-            self.finishPicker()
-            self.state = .idle
-            Toast.shared.show("録画の対象を選べませんでした")
-        }
-    }
-
-    private func finishPicker() {
-        SCContentSharingPicker.shared.remove(self)
-        SCContentSharingPicker.shared.isActive = false
-    }
-
-    /// picker で選んだフィルタは picker が与えたアクセス権にぶら下がるので、picker は録画が終わるまでアクティブのままにする
-    /// （選んだ直後に isActive = false にすると、ウィンドウの録画が「The stream is nil」で始まらなかった）
-    private func picked(_ pickerFilter: SCContentFilter) {
-        guard state == .picking else { return }
-        let isDisplay = pickerFilter.style == .display
-        let displayID = pickerFilter.includedDisplays.first?.displayID
-        if !isDisplay, let owner = pickerFilter.includedWindows.first?.owningApplication?.bundleIdentifier {
-            sourceApp = owner
-        }
-        targetScreen = displayID.flatMap(NSScreen.withID) ?? .underMouse
-        Log.write("record.picked style=\(isDisplay ? "display" : "window") raw_style=\(pickerFilter.style.rawValue) displays=\(pickerFilter.includedDisplays.count) windows=\(pickerFilter.includedWindows.count) rect=\(NSStringFromRect(pickerFilter.contentRect))")
+        sourceApp = app
+        targetScreen = screen
         state = .countdown
-        countdown.start(seconds: 3, on: targetScreen, finish: { [weak self] in
-            self?.begin(pickerFilter, isDisplay: isDisplay, displayID: displayID)
+        Log.write("record.region screen=\(screen.displayID) rect=\(NSStringFromRect(rect))")
+        countdown.start(seconds: 3, on: screen, finish: { [weak self] in
+            self?.begin(screen: screen, rect: rect)
         }, cancel: { [weak self] in
-            self?.finishPicker()
             self?.state = .idle
         })
     }
 
-    // MARK: - 録画
-
-    /// ディスプレイのときは、自分のウィンドウ（サムネイル・ピン等）を外したフィルタに作り直す。
-    /// ウィンドウのときは、そのウィンドウだけが写るので picker のフィルタをそのまま使う
-    private func begin(_ pickerFilter: SCContentFilter, isDisplay: Bool, displayID: CGDirectDisplayID?) {
-        guard isDisplay, let displayID else {
-            start(with: pickerFilter)
-            return
-        }
-        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
-            DispatchQueue.main.async {
-                guard let content, let display = content.displays.first(where: { $0.displayID == displayID }) else {
-                    Log.write("record.rebuild_filter_failed error=\(String(describing: error))")
-                    self.start(with: pickerFilter)
-                    return
-                }
-                let mine = content.applications.filter { $0.bundleIdentifier == Bundle.main.bundleIdentifier }
-                self.start(with: SCContentFilter(display: display, excludingApplications: mine, exceptingWindows: []))
-            }
-        }
-    }
-
-    /// 検証フック `--record-display <秒>`: picker とカウントダウンを飛ばして、マウスのある画面を録る
-    func startForTest(seconds: Double) {
+    /// 検証フック `--record-display <秒>` / `--aio-record x y w h <秒>`: カウントダウンを飛ばして、マウスのある画面（か、その範囲）を録る
+    func startForTest(seconds: Double, rect: CGRect? = nil) {
         guard state == .idle else { return }
         targetScreen = .underMouse
         sourceApp = CaptureStore.frontmostAppID()
         state = .countdown
-        begin(SCContentFilter(), isDisplay: true, displayID: targetScreen.displayID)
+        begin(screen: targetScreen, rect: rect)
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in self?.stop(reason: "test") }
     }
 
-    private func start(with filter: SCContentFilter) {
-        let size = RecordingFormat.outputSize(points: filter.contentRect.size)
+    // MARK: - 録画
+
+    /// 自分のウィンドウ（サムネイル・ピン・枠等）を外したディスプレイのフィルタで録る。`rect` があればその範囲だけ
+    private func begin(screen: NSScreen, rect: CGRect?) {
+        let displayID = screen.displayID
+        SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
+            DispatchQueue.main.async {
+                guard let content, let display = content.displays.first(where: { $0.displayID == displayID }) else {
+                    Log.write("record.no_display id=\(displayID) error=\(String(describing: error))")
+                    self.state = .idle
+                    Toast.shared.show("録画を始められませんでした")
+                    return
+                }
+                let mine = content.applications.filter { $0.bundleIdentifier == Bundle.main.bundleIdentifier }
+                self.start(with: SCContentFilter(display: display, excludingApplications: mine, exceptingWindows: []), rect: rect)
+            }
+        }
+    }
+
+    private func start(with filter: SCContentFilter, rect: CGRect?) {
+        let size = RecordingFormat.outputSize(points: rect?.size ?? filter.contentRect.size)
         let config = SCStreamConfiguration()
+        if let rect {
+            // 縮めないときは、範囲も出力（偶数）と同じ大きさに削る（右・下を 1pt）。1pt 未満の縮小で全体がぼやけないように
+            let exact = CGFloat(size.width) <= rect.width && CGFloat(size.height) <= rect.height
+                && max(rect.width, rect.height) <= RecordingFormat.maxDimension
+            config.sourceRect = exact ? CGRect(x: rect.minX, y: rect.minY, width: CGFloat(size.width), height: CGFloat(size.height)) : rect
+        }
         config.width = size.width
         config.height = size.height
         config.minimumFrameInterval = CMTime(value: 1, timescale: RecordingFormat.fps)
@@ -149,7 +107,6 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
             try stream.addRecordingOutput(output)
         } catch {
             Log.write("record.add_output_failed error=\(error)")
-            finishPicker()
             state = .idle
             Toast.shared.show("録画を始められませんでした")
             return
@@ -158,11 +115,11 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         self.output = output
         tmpURL = tmp
         stopReason = "user"
+        let screen = targetScreen
         stream.startCapture { error in
             DispatchQueue.main.async {
                 if let error {
                     Log.write("record.start_failed error=\(error)")
-                    self.finishPicker()
                     self.cleanup()
                     self.state = .idle
                     Toast.shared.show("録画を始められませんでした")
@@ -170,7 +127,8 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
                 }
                 self.startedAt = Date()
                 self.state = .recording
-                Log.write("record.started size=\(size.width)x\(size.height) fps=\(RecordingFormat.fps)")
+                if let rect { self.frame.show(around: AIOLayout.global(rect, screenFrame: screen.frame)) }
+                Log.write("record.started size=\(size.width)x\(size.height) fps=\(RecordingFormat.fps) rect=\(rect.map { NSStringFromRect($0) } ?? "display")")
             }
         }
     }
@@ -179,6 +137,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         guard state == .recording, let stream else { return }
         stopReason = reason
         state = .stopping
+        frame.hide()
         stream.stopCapture { error in
             if let error { Log.write("record.stop_error error=\(error)") }
             // ファイルの確定は recordingOutputDidFinishRecording で受ける。来なければ 3 秒後にここで確定させる
@@ -226,7 +185,6 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         let duration = startedAt.map { Date().timeIntervalSince($0) } ?? 0
         let reason = stopReason
         let screen = targetScreen
-        finishPicker()
         cleanup()
         state = .idle
         guard FileManager.default.fileExists(atPath: tmp.path) else {
@@ -244,6 +202,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
     }
 
     private func cleanup() {
+        frame.hide()
         stream = nil
         output = nil
         tmpURL = nil

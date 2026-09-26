@@ -75,9 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerHotKeys() {
         let pairs: [(HotKeyBindings.Binding, () -> Void)] = [
             (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
-            (HotKeyBindings.record, { [weak self] in self?.capture.toggleRecording() }),
+            (HotKeyBindings.allInOne, { [weak self] in self?.capture.toggleAllInOne() }),
             (HotKeyBindings.lastRegion, { [weak self] in self?.capture.captureLastRegion() }),
-            (HotKeyBindings.history, { [weak self] in self?.capture.history.toggle() }),
+            (HotKeyBindings.history, { [weak self] in
+                guard let self, !capture.isBlockedByAIO("history") else { return }
+                capture.history.toggle()
+            }),
         ]
         for (binding, handler) in pairs {
             let status = HotKeyCenter.shared.register(keyCode: binding.keyCode, modifiers: binding.modifiers, handler: handler)
@@ -173,13 +176,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--edit-undo` / `--edit-dump`（要素・選択・取り消しの深さをログへ）/ `--edit-snapshot <png>` / `--edit-save`（保存してサムネイルを置き換える）/ `--edit-close`（確認なしで破棄）
     /// `--history-open [screenshots|videos]`: キャプチャ履歴を開く（アクティブにしない）/ `--history-dump`: タブ・件数・フォーカス・各項目をログへ
     /// `--history-focus <n>` / `--history-kind <screenshots|videos>` / `--history-restore`（フォーカス中を戻す）/ `--history-snapshot <png>` / `--history-close`
-    /// `--record-display <秒>`: picker とカウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
+    /// `--record-display <秒>`: カウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
+    /// `--aio-capture <x> <y> <w> <h>`: オールインワンで範囲を選んで Capture した後の経路（マウスのある画面・左上原点のポイント。許可が要る）
+    /// `--aio-record <x> <y> <w> <h> <秒>`: カウントダウンを飛ばして、その範囲を指定秒数だけ録る（許可が要る）
+    /// `--aio-snapshot <x> <y> <w> <h> <png>`: その範囲を選んだ状態の暗幕とツールバーを、画面に出さずに PNG に描く
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
         while !queue.isEmpty {
             let cmd = queue.removeFirst()
             func arg() -> String? { queue.isEmpty ? nil : queue.removeFirst() }
+            func rectArg() -> CGRect? {
+                let v = [arg(), arg(), arg(), arg()].compactMap { $0.flatMap(Double.init) }
+                return v.count == 4 ? CGRect(x: v[0], y: v[1], width: v[2], height: v[3]) : nil
+            }
             switch cmd {
             case "--tcc":
                 ScreenCapturer.logPermission(when: "hook")
@@ -248,6 +258,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 capture.editor.save()
             case "--edit-close":
                 capture.editor.close()
+            case "--aio-capture":
+                if let r = rectArg() {
+                    let screen = NSScreen.underMouse
+                    LastRegion.save(LastRegion(displayID: screen.displayID, rect: r))
+                    capture.captureArea(screen: screen, rect: r, app: CaptureStore.frontmostAppID(), kind: "aio")
+                }
+            case "--aio-record":
+                if let r = rectArg(), let sec = arg().flatMap(Double.init) {
+                    LastRegion.save(LastRegion(displayID: NSScreen.underMouse.displayID, rect: r))
+                    capture.recorder.startForTest(seconds: sec, rect: r)
+                }
+            case "--aio-snapshot":
+                if let r = rectArg() {
+                    let path = arg() ?? "/tmp/mycap-aio.png"
+                    Log.write("hook.aio_snapshot path=\(path) ok=\(capture.aio.snapshot(rect: r, to: path))")
+                }
             case "--record-display":
                 if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
             case "--history-open":

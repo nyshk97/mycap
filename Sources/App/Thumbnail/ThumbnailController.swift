@@ -176,12 +176,18 @@ final class ThumbnailController {
         Log.write("thumbnail.closed_all count_before=\(before)")
     }
 
-    /// 撮影中（`screencapture -i` の範囲・ウィンドウ選択中）は隠す。ウィンドウとして選べてしまうのを防ぐ
+    /// 撮影中（`screencapture -i` の範囲・ウィンドウ選択中、オールインワンの暗幕）は隠す。ウィンドウとして選べてしまうのを防ぐ。
+    /// 隠している間はホバーで取ったキー（Esc 等）も放す（暗幕やカウントダウンの Esc を取られないように）
     func setHidden(_ hide: Bool) {
         hidden = hide
         if hide { disarm(reason: "hidden") }
         for item in items {
-            if hide { item.panel.orderOut(nil) } else { item.panel.orderFrontRegardless() }
+            if hide {
+                item.panel.thumbnailView.releaseKeys()
+                item.panel.orderOut(nil)
+            } else {
+                item.panel.orderFrontRegardless()
+            }
         }
     }
 

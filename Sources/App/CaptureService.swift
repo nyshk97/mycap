@@ -7,6 +7,7 @@ final class CaptureService {
     let editor = EditorController()
     let recorder = Recorder()
     let history = HistoryController()
+    private(set) lazy var aio = AIOController(recorder: recorder)
 
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
@@ -21,14 +22,29 @@ final class CaptureService {
             self?.thumbnails.restore(url: url, screen: screen, arm: .init(via: "restore", returnTo: back))
         }
         history.onOpen = { [weak self] in self?.thumbnails.disarm(reason: "history") }
+        aio.prepare = { [weak self] in
+            guard let self, ensurePermission() else { return false }
+            thumbnails.disarm(reason: "aio")
+            thumbnails.setHidden(true)
+            return true
+        }
+        aio.onClosed = { [weak self] in self?.thumbnails.setHidden(false) }
+        aio.onCapture = { [weak self] screen, rect, app in self?.captureArea(screen: screen, rect: rect, app: app, kind: "aio") }
     }
     private let capturer = ScreenCapturer()
     private let drag = DragTracker()
     private var fullScreenRunning = false
 
+    /// オールインワンの暗幕・タイマーが出ている間は、ほかの撮影のホットキーを受けない（暗幕の上に選択 UI が重なるため）
+    func isBlockedByAIO(_ what: String) -> Bool {
+        guard aio.isBusy else { return false }
+        Log.write("capture.ignored mode=\(what) reason=aio")
+        return true
+    }
+
     /// 範囲／ウィンドウ（Space で切り替え）
     func captureRegion() {
-        guard ensurePermission() else { return }
+        guard !isBlockedByAIO("region"), ensurePermission() else { return }
         let app = CaptureStore.frontmostAppID()
         thumbnails.setHidden(true)
         drag.start()
@@ -68,8 +84,9 @@ final class CaptureService {
 
     /// 前回ドラッグで選んだ範囲を、選択 UI を出さずに撮る
     func captureLastRegion() {
+        guard !isBlockedByAIO("last_region") else { return }
         guard let region = LastRegion.load() else {
-            Toast.shared.show("前回の範囲がありません。先に \(HotKeyBindings.region.label) で範囲をドラッグして撮ってください")
+            Toast.shared.show("前回の範囲がありません。先に \(HotKeyBindings.region.label) かオールインワン（\(HotKeyBindings.allInOne.label)）で範囲を選んで撮ってください")
             return
         }
         guard let screen = NSScreen.withID(region.displayID) else {
@@ -77,33 +94,35 @@ final class CaptureService {
             Log.write("capture.last_region.no_display id=\(region.displayID)")
             return
         }
-        guard ensurePermission(), !fullScreenRunning else { return }
+        guard ensurePermission() else { return }
+        captureArea(screen: screen, rect: region.rect, app: CaptureStore.frontmostAppID(), kind: "last_region")
+    }
+
+    /// 範囲（ディスプレイ内の左上原点のポイント）を選択 UI なしで撮る（前回の範囲・オールインワンの Capture とタイマー）
+    func captureArea(screen: NSScreen, rect: CGRect, app: String?, kind: String) {
+        guard !fullScreenRunning else { return }
         fullScreenRunning = true
-        let app = CaptureStore.frontmostAppID()
-        Log.write("capture.started mode=last_region screen=\(screen.displayID) rect=\(NSStringFromRect(region.rect))")
-        FullScreenCapturer.capture(screen: screen, rect: region.rect) { [weak self] tmp in
+        Log.write("capture.started mode=\(kind) screen=\(screen.displayID) rect=\(NSStringFromRect(rect))")
+        FullScreenCapturer.capture(screen: screen, rect: rect) { [weak self] tmp in
             guard let self else { return }
             fullScreenRunning = false
             ScreenCapturer.logPermission(when: "after_capture")
             guard let tmp else {
-                Toast.shared.show("前回の範囲を撮れませんでした")
+                Toast.shared.show("範囲を撮れませんでした")
                 return
             }
-            finish(tmp: tmp, kind: "last_region", screen: screen, app: app)
+            finish(tmp: tmp, kind: kind, screen: screen, app: app)
         }
     }
 
-    /// 録画の開始（対象を選ぶ）／カウントダウンのキャンセル／停止
-    func toggleRecording() {
-        if recorder.state == .idle, !ensurePermission() { return }
-        // カウントダウンの Esc と取り合わないように
-        if recorder.state == .idle { thumbnails.disarm(reason: "record") }
-        recorder.toggle()
+    /// ⌘⇧5: オールインワン（録画中なら停止、カウントダウン中ならキャンセル）
+    func toggleAllInOne() {
+        aio.toggle()
     }
 
     /// 範囲を選んで文字を読む。画像は保存せず、サムネイルも出さない
     func captureOCR() {
-        guard ensurePermission() else { return }
+        guard !isBlockedByAIO("ocr"), ensurePermission() else { return }
         thumbnails.setHidden(true)
         capturer.capture(.interactive) { [weak self] tmp in
             self?.thumbnails.setHidden(false)
@@ -119,7 +138,7 @@ final class CaptureService {
 
     /// マウスのあるディスプレイ全体
     func captureFullScreen() {
-        guard ensurePermission(), !fullScreenRunning else { return }
+        guard !isBlockedByAIO("full"), ensurePermission(), !fullScreenRunning else { return }
         fullScreenRunning = true
         let screen = NSScreen.underMouse
         let app = CaptureStore.frontmostAppID()

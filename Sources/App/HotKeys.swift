@@ -78,7 +78,8 @@ enum HotKeyBindings {
     #endif
 
     static let region = Binding(keyCode: kVK_ANSI_4, modifiers: mods, label: prefix + "4")
-    static let record = Binding(keyCode: kVK_ANSI_5, modifiers: mods, label: prefix + "5")
+    /// オールインワン（範囲を選んで Capture / Timer / Recording）。録画中は停止
+    static let allInOne = Binding(keyCode: kVK_ANSI_5, modifiers: mods, label: prefix + "5")
     static let lastRegion = Binding(keyCode: kVK_ANSI_6, modifiers: mods, label: prefix + "6")
     /// キャプチャ履歴（CleanShot X で使っていたのと同じ ⌘⇧3）
     static let history = Binding(keyCode: kVK_ANSI_3, modifiers: mods, label: prefix + "3")

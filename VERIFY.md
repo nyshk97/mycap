@@ -22,9 +22,10 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|history|record|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|history|aio|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
+`aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|timer|record` / `aio.closed reason=escape|toggle|capture|timer|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `timer.countdown_started` / `timer.countdown_cancelled` / `record.region` / `record.started size= rect=` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
@@ -62,6 +63,13 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --history-focus 2 --history-kind videos --history-snapshot $S/history.png
 "${B[@]}" --history-restore      # フォーカス中をサムネイルに戻す → history.restored / thumbnail.added（同じファイルが出ていたら thumbnail.closed reason=restored_again）
 "${B[@]}" --history-close
+# オールインワン（⌘⇧5）。暗幕はユーザーの画面を塞ぐので AI からは開かない。範囲はマウスのある画面・左上原点のポイント
+"${B[@]}" --aio-snapshot 400 250 608 455 $S/aio.png   # その範囲を選んだ状態の暗幕＋ツールバー（画面に出さない。範囲の穴は白、影は写らない）
+"${B[@]}" --aio-snapshot 0 0 5000 5000 $S/aio-full.png  # 画面いっぱい（切り詰められる）→ ツールバーは範囲の内側の下端
+"${B[@]}" --aio-capture 100 80 400 300    # 範囲を選んで Capture した後の経路（許可が要る）→ 2x の画面なら capture.aio.captured px=800x600、region.remembered
+"${B[@]}" --aio-record 200 150 333 211 3  # カウントダウンを飛ばして範囲を 3 秒録る（許可が要る）→ record.started size=332x210（RecordingFormat.outputSize）
+ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 ~/Library/Caches/mycap-dev/<録れた名前>.mp4
+# 録画中の赤い枠は範囲の外側なので写らない（ffmpeg -ss 1.5 -i <mp4> -frames:v 1 で 1 コマ抜いて見る）
 # OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）
@@ -92,6 +100,7 @@ J
 - `--tcc`: 許可の状態をログに出すだけ
 - キャプチャ履歴の時刻はファイル名から取る（`--ingest` のコピーは作成日時が元ファイルのものになるため）。編集の出力（`_edited`）だけ作成日時。`--history-snapshot` はプロセス内描画なので、すりガラスの背景は灰色に写る
 - キャプチャ履歴のキー操作（←→ / Enter / Esc / Tab）・ホバー・ダブルクリック・外クリックで閉じる・閉じたあと元のアプリに戻るは、パネルを key にする必要がありフォーカスを奪うので、人間が ⌃⌥⌘3 で確かめる
+- オールインワンの暗幕の操作（ドラッグ・移動・ハンドル・W / H の入力・Esc / Enter・カーソルの形）とボタン、Timer のカウントダウンは、暗幕を key にしてユーザーの画面を塞ぐので人間が ⌃⌥⌘5 で確かめる。`aio.opened … key=true` なら、mycap が前面にならないまま暗幕が key になっている
 - 前回の範囲は `defaults read io.github.nyshk97.mycap.dev lastRegion` にある。確認後は `defaults delete` で消す（メニューの「前回と同じ範囲を撮る」が有効のまま残る）。⌘⇧4 のドラッグで覚える経路は `screencapture -i` が要るので人間が確かめる（ログの `region.remembered` / `region.remember_skipped reason=…`）
 - `--edit-snapshot` はキャンバス（画像・注釈・選択枠）と色の丸は写るが、ツールバーのスライダー・ボタンの文字はプロセス内描画に出ない。ツールバーの見た目・マウスで描く・文字の入力（日本語の変換）・⌘Z / ⌘S / Esc は、ウィンドウを key にする必要があるので人間が確かめる
 - **ユーザーが dev 版を触っている間は編集のフックを撃たない**。`--edit-close` は確認なしで破棄し、`--close-all` はサムネイルを全部閉じる（2026-09-26 に、ユーザーが ⌘E で描いていたモザイクを消した実例）。撃つ前に `tail ~/Library/Logs/mycap/mycap-dev.log` で `thumbnail.key` / `edit.opened` が自分のフック以外から出ていないか見る。`--edit-open` は描きかけがあると `edit.open_blocked` で開かない
