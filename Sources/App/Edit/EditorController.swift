@@ -29,7 +29,6 @@ final class EditorController: NSObject, NSWindowDelegate {
         let canvas = EditorCanvas(model: model)
         model.onChange = { [weak canvas] in canvas?.modelChanged() }
         model.onSave = { [weak self] in self?.save() }
-        model.onCancel = { [weak self] in self?.requestClose() }
         canvas.onEscape = { [weak self] in self?.requestClose() }
         self.model = model
         self.canvas = canvas

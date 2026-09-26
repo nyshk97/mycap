@@ -14,7 +14,7 @@ final class EditorModel: ObservableObject {
     /// 矢印の太さ（pt）
     @Published private(set) var arrowPt: Double = 6
     /// 四角の線の太さ（pt）
-    @Published private(set) var rectPt: Double = 4
+    @Published private(set) var rectPt: Double = 6
     /// 文字の大きさ（pt）
     @Published private(set) var textPt: Double = 24
     /// モザイクのブロックの一辺（pt）
@@ -26,7 +26,6 @@ final class EditorModel: ObservableObject {
     /// 描き直しが要るとき（キャンバスが受ける）
     var onChange: (() -> Void)?
     var onSave: (() -> Void)?
-    var onCancel: (() -> Void)?
 
     private var history = AnnotationHistory()
     /// スライダーを動かし始めたときの要素（離したときに 1 回分の取り消しとして積む）

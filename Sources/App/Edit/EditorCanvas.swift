@@ -226,7 +226,7 @@ final class EditorCanvas: NSView, NSTextViewDelegate {
         switch c {
         case "a": model.tool = .arrow
         case "r": model.tool = .rect
-        case "m": model.tool = .mosaic
+        case "p": model.tool = .mosaic
         case "t": model.tool = .text
         default: super.keyDown(with: event)
         }

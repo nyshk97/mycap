@@ -7,7 +7,7 @@ struct EditorToolbar: View {
     private static let tools: [(Annotation.Kind, String, String)] = [
         (.arrow, "arrow.up.right", "矢印（A）"),
         (.rect, "rectangle", "四角（R）"),
-        (.mosaic, "checkerboard.rectangle", "モザイク（M）"),
+        (.mosaic, "checkerboard.rectangle", "モザイク（P）"),
         (.text, "textformat", "文字（T）"),
     ]
 
@@ -35,23 +35,15 @@ struct EditorToolbar: View {
             Divider().frame(height: 20)
 
             if kind != .mosaic {
-                HStack(spacing: 6) {
-                    ForEach(AnnotationColor.presets, id: \.self) { c in
-                        Circle()
-                            .fill(Color(.sRGB, red: c.r, green: c.g, blue: c.b))
-                            .frame(width: 16, height: 16)
-                            .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.5))
-                            .overlay(Circle().stroke(Color.accentColor, lineWidth: 2).padding(-3).opacity(model.color == c ? 1 : 0))
-                            .contentShape(Circle())
-                            .onTapGesture { model.setColor(c) }
-                    }
-                }
+                ColorMenu(model: model)
                 Divider().frame(height: 20)
             }
 
             HStack(spacing: 6) {
-                Text(kind == .text ? "大きさ" : kind == .mosaic ? "粗さ" : "太さ")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                Image(systemName: kind == .text ? "textformat.size" : kind == .mosaic ? "square.grid.3x3" : "lineweight")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .frame(width: 18)
+                    .help(kind == .text ? "文字の大きさ" : kind == .mosaic ? "モザイクの粗さ" : "線の太さ")
                 Slider(value: Binding(get: { model.sizePt }, set: { model.sizePt = $0 }),
                        in: EditorModel.sizeRange(kind), onEditingChanged: { model.sliderEditing($0) })
                     .frame(width: 110)
@@ -76,16 +68,66 @@ struct EditorToolbar: View {
                 .buttonStyle(.borderless).disabled(!model.canUndo).help("取り消す（⌘Z）")
             Button { model.redo() } label: { Image(systemName: "arrow.uturn.forward") }
                 .buttonStyle(.borderless).disabled(!model.canRedo).help("やり直す（⌘⇧Z）")
-            Button("キャンセル") { model.onCancel?() }
-                .controlSize(.small)
-            Button("保存") { model.onSave?() }
-                .controlSize(.small)
-                .buttonStyle(.borderedProminent)
-                .help("保存してサムネイルを置き換える（⌘S）")
+            // キャンセルはウィンドウの閉じるボタンと Esc で足りるので置かない
+            Button { model.onSave?() } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(Color.accentColor))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 4)
+            .help("保存（⌘S）")
         }
         .padding(.horizontal, 12)
         .frame(height: EditorToolbar.height)
     }
 
     static let height: CGFloat = 40
+}
+
+/// 今の色だけを出し、押すと 8 色のプリセットを並べたポップオーバーを開く
+private struct ColorMenu: View {
+    @ObservedObject var model: EditorModel
+    @State private var open = false
+
+    var body: some View {
+        Button { open.toggle() } label: {
+            HStack(spacing: 3) {
+                Swatch(color: model.color, size: 16)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("色")
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            HStack(spacing: 8) {
+                ForEach(AnnotationColor.presets, id: \.self) { c in
+                    Swatch(color: c, size: 20)
+                        .overlay(Circle().stroke(Color.accentColor, lineWidth: 2).padding(-3).opacity(model.color == c ? 1 : 0))
+                        .contentShape(Circle())
+                        .onTapGesture {
+                            model.setColor(c)
+                            open = false
+                        }
+                }
+            }
+            .padding(10)
+        }
+    }
+}
+
+private struct Swatch: View {
+    let color: AnnotationColor
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(Color(.sRGB, red: color.r, green: color.g, blue: color.b))
+            .frame(width: size, height: size)
+            .overlay(Circle().stroke(Color.primary.opacity(0.35), lineWidth: 0.5))
+    }
 }
