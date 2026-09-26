@@ -56,22 +56,22 @@ final class ThumbnailController {
         let actions = ThumbnailView.Actions(
             copy: { [weak self] in
                 ImageClipboard.copy(url)
-                Toast.shared.show("コピーしました")
+                Toast.shared.show("コピーしました", near: panel.frame)
                 self?.close(panel, reason: "copied")
             },
             save: { [weak self] in
                 guard let saved = CaptureStore.save(url) else {
-                    Toast.shared.show("保存できませんでした: \(Env.saveDir.path)")
+                    Toast.shared.show("保存できませんでした: \(Env.saveDir.path)", near: panel.frame)
                     return
                 }
                 Log.write("thumbnail.saved name=\(saved.lastPathComponent) dir=\(saved.deletingLastPathComponent().path)")
-                Toast.shared.show("保存しました: \(saved.lastPathComponent)")
+                Toast.shared.show("保存しました: \(saved.lastPathComponent)", near: panel.frame)
                 self?.close(panel, reason: "saved")
             },
             pin: { [weak self] in self?.onPin?(url) },
             ocr: { [weak self] in
                 // 認識はキャッシュのファイルから非同期に行うので、先に閉じてよい（結果はトーストで出る）
-                OCR.recognizeAndCopy(url: url, source: "thumbnail")
+                OCR.recognizeAndCopy(url: url, source: "thumbnail", near: panel.frame)
                 self?.close(panel, reason: "ocr")
             },
             style: { [weak self] in self?.onStyle?(url) },

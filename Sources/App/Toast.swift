@@ -1,6 +1,7 @@
 import AppKit
 
-/// マウスのある画面の下寄りに短く出す通知。`action` を渡すとクリックで実行できる（システム設定を開く等）
+/// マウスのある画面の下寄りに短く出す通知。`near` を渡すとその枠（サムネイル）の右隣に出す。
+/// `action` を渡すとクリックで実行できる（システム設定を開く等）
 final class Toast {
     static let shared = Toast()
 
@@ -8,8 +9,7 @@ final class Toast {
     private var hideWork: DispatchWorkItem?
     private var action: (() -> Void)?
 
-    func show(_ text: String, duration: TimeInterval = 2.5, action: (() -> Void)? = nil) {
-        Log.write("toast.shown text=\(text.replacingOccurrences(of: "\n", with: " "))")
+    func show(_ text: String, near anchor: NSRect? = nil, duration: TimeInterval = 2.5, action: (() -> Void)? = nil) {
         hideWork?.cancel()
         panel?.orderOut(nil)
         self.action = action
@@ -34,8 +34,15 @@ final class Toast {
         label.frame = NSRect(x: pad.width, y: pad.height, width: size.width, height: size.height)
         content.addSubview(label)
 
-        let screen = NSScreen.underMouse.visibleFrame
-        let origin = NSPoint(x: screen.midX - frameSize.width / 2, y: screen.minY + 80)
+        let origin: NSPoint
+        if let anchor {
+            let screen = NSScreen.screens.first { $0.frame.intersects(anchor) } ?? .underMouse
+            origin = ThumbnailLayout.toastOrigin(anchor: anchor, size: frameSize, visible: screen.visibleFrame)
+        } else {
+            let screen = NSScreen.underMouse.visibleFrame
+            origin = NSPoint(x: screen.midX - frameSize.width / 2, y: screen.minY + 80)
+        }
+        Log.write("toast.shown text=\(text.replacingOccurrences(of: "\n", with: " ")) frame=\(NSStringFromRect(NSRect(origin: origin, size: frameSize)))")
         let p = NSPanel(contentRect: NSRect(origin: origin, size: frameSize), styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: false)
         p.isOpaque = false

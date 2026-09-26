@@ -28,6 +28,13 @@ enum ThumbnailLayout {
         }
     }
 
+    /// サムネイルから出した通知（コピーしました等）の置き場所。サムネイルの右隣に縦の中央をそろえ、画面からはみ出さないよう寄せる
+    static func toastOrigin(anchor: CGRect, size: CGSize, visible: CGRect) -> CGPoint {
+        let x = min(anchor.maxX + spacing, visible.maxX - size.width)
+        let y = min(max(anchor.midY - size.height / 2, visible.minY), visible.maxY - size.height)
+        return CGPoint(x: max(x, visible.minX), y: y)
+    }
+
     /// 最新が先頭の並びで `count` 枚あるとき、閉じるべき古いものの数
     static func overflow(count: Int) -> Int {
         max(0, count - maxCount)

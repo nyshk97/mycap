@@ -80,6 +80,26 @@ final class ThumbnailLayoutTests: XCTestCase {
         XCTAssertEqual(frames[0].minX, -2560 + ThumbnailLayout.margin)
     }
 
+    func testToastSitsRightOfThumbnailCenteredVertically() {
+        let anchor = ThumbnailLayout.frames(visible: builtIn, sizes: [CGSize(width: 240, height: 135)])[0]
+        let origin = ThumbnailLayout.toastOrigin(anchor: anchor, size: CGSize(width: 140, height: 40), visible: builtIn)
+        XCTAssertEqual(origin.x, anchor.maxX + ThumbnailLayout.spacing)
+        XCTAssertEqual(origin.y + 20, anchor.midY)
+    }
+
+    func testToastStaysInsideVisibleFrame() {
+        // 最小のサムネイルより背の高い通知（折り返した OCR の結果）でも画面の下にはみ出さない
+        let anchor = ThumbnailLayout.frames(visible: studioLeft, sizes: [ThumbnailLayout.minPanel])[0]
+        let size = CGSize(width: 460, height: 200)
+        let origin = ThumbnailLayout.toastOrigin(anchor: anchor, size: size, visible: studioLeft)
+        XCTAssertTrue(studioLeft.contains(CGRect(origin: origin, size: size)), "origin=\(origin)")
+        XCTAssertEqual(origin.y, studioLeft.minY, "anchor.midY=\(anchor.midY)")
+        // 右端に寄ったサムネイルでも通知は画面の中に収まる
+        let right = CGRect(x: builtIn.maxX - 100, y: 400, width: 90, height: 96)
+        let o2 = ThumbnailLayout.toastOrigin(anchor: right, size: CGSize(width: 140, height: 40), visible: builtIn)
+        XCTAssertEqual(o2.x, builtIn.maxX - 140)
+    }
+
     func testOverflowKeepsFive() {
         XCTAssertEqual(ThumbnailLayout.overflow(count: 5), 0)
         XCTAssertEqual(ThumbnailLayout.overflow(count: 6), 1)

@@ -29,14 +29,15 @@ enum OCR {
         return OCRText.assemble(fragments)
     }
 
-    /// 読んだ文字をクリップボードに入れ、冒頭をトーストで見せる。`copy: false` は検証フック用
-    static func recognizeAndCopy(url: URL, source: String, copy: Bool = true, completion: ((String) -> Void)? = nil) {
+    /// 読んだ文字をクリップボードに入れ、冒頭をトーストで見せる（`near` はトーストを出す横の枠）。`copy: false` は検証フック用
+    static func recognizeAndCopy(url: URL, source: String, near anchor: NSRect? = nil, copy: Bool = true,
+                                 completion: ((String) -> Void)? = nil) {
         let started = Date()
         recognize(url: url) { text in
             let ms = Int(Date().timeIntervalSince(started) * 1000)
             Log.write("ocr.done source=\(source) chars=\(text.count) lines=\(text.isEmpty ? 0 : text.components(separatedBy: "\n").count) ms=\(ms)")
             if text.isEmpty {
-                Toast.shared.show("文字が見つかりませんでした")
+                Toast.shared.show("文字が見つかりませんでした", near: anchor)
             } else {
                 if copy {
                     NSPasteboard.general.clearContents()
@@ -44,7 +45,7 @@ enum OCR {
                 }
                 let flat = text.replacingOccurrences(of: "\n", with: " ")
                 let head = flat.count > 60 ? String(flat.prefix(60)) + "…" : flat
-                Toast.shared.show(copy ? "コピーしました: \(head)" : "（コピーなし）\(head)")
+                Toast.shared.show(copy ? "コピーしました: \(head)" : "（コピーなし）\(head)", near: anchor)
             }
             completion?(text)
         }
