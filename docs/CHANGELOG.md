@@ -44,6 +44,8 @@ Capit の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-26
+
 ### 📝 Changed
 - アプリ名を mycap から Capit に変更（キャッシュ・履歴・前回の設定は引き継がない。画面収録の許可は付け直しが必要）
 
