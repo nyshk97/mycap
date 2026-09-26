@@ -316,7 +316,7 @@ final class ThumbnailController {
     /// 最新のサムネイル（のファイル）。検証フックの `--video-trim` 等
     var newestURL: URL? { items.first?.panel.url }
 
-    /// 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えて使う）
+    /// 最新のサムネイルの「保存」を押す（保存先は CAPIT_SAVE_DIR で差し替えて使う）
     func saveNewest() {
         items.first?.panel.thumbnailView.pressSave()
     }

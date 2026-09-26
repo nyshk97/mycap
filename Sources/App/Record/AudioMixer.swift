@@ -29,7 +29,7 @@ enum AudioMixer {
             Log.write("record.audio_mix_failed step=load")
             return nil
         }
-        let dst = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-mix-\(UUID().uuidString).mp4")
+        let dst = FileManager.default.temporaryDirectory.appendingPathComponent("capit-mix-\(UUID().uuidString).mp4")
         do {
             let reader = try AVAssetReader(asset: asset)
             let writer = try AVAssetWriter(outputURL: dst, fileType: .mp4)
@@ -91,7 +91,7 @@ enum AudioMixer {
 
     /// 読めるだけ読んで書く。書き手が詰まったら待つ
     private static func pump(_ output: AVAssetReaderOutput, into input: AVAssetWriterInput, label: String) async {
-        let queue = DispatchQueue(label: "mycap.mix.\(label)")
+        let queue = DispatchQueue(label: "capit.mix.\(label)")
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             var finished = false
             input.requestMediaDataWhenReady(on: queue) {

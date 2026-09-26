@@ -17,8 +17,8 @@ final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
     var onSaved: ((URL, NSScreen, String?) -> Void)?
 
     private let overlay = ScrollOverlay()
-    private let deliveryQueue = DispatchQueue(label: "mycap.scroll.delivery")
-    private let workQueue = DispatchQueue(label: "mycap.scroll.work")
+    private let deliveryQueue = DispatchQueue(label: "capit.scroll.delivery")
+    private let workQueue = DispatchQueue(label: "capit.scroll.work")
     private var stream: SCStream?
     private var screen: NSScreen = .underMouse
     private var app: String?
@@ -186,7 +186,7 @@ final class ScrollCapturer: NSObject, SCStreamDelegate, SCStreamOutput {
     /// つないだ画像を PNG の一時ファイルに書く（workQueue で）
     private func render() -> URL? {
         guard let buf = stitcher.compose(), let image = Self.cgImage(buf, colorSpace: colorSpace) else { return nil }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).png")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("capit-\(UUID().uuidString).png")
         return FullScreenCapturer.writePNG(image, scale: scale, to: url) ? url : nil
     }
 

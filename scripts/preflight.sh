@@ -6,10 +6,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-GITHUB_REPO="nyshk97/mycap"
+GITHUB_REPO="nyshk97/capit"
 TEAM_ID="VYDUR99LAM"
 NOTARY_PROFILE="${NOTARY_PROFILE:-nyshk97-notary}"
-SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-mycap}"
+SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-capit}"
 VERSION="${RELEASE_VERSION:-$(grep -m1 'MARKETING_VERSION:' project.yml | sed 's/.*MARKETING_VERSION:[[:space:]]*//' | tr -d '"' | tr -d ' ')}"
 TAG="v$VERSION"
 [ -n "$VERSION" ] || { echo "NG: project.yml から MARKETING_VERSION を取れない"; exit 1; }
@@ -71,7 +71,7 @@ fi
 # SUPublicEDKey が未設定のままだと、配ったアプリが更新を検証できない（Sparkle も起動しない）
 if grep -q '__SPARKLE_PUBLIC_KEY_NOT_SET__' project.yml; then
     echo "NG: project.yml の SUPublicEDKey が未設定"
-    echo "    build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account mycap の公開鍵を書く"
+    echo "    build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account capit の公開鍵を書く"
     exit 1
 fi
 
@@ -101,7 +101,7 @@ if ! notary_out=$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" 
 fi
 if ! security find-generic-password -s "https://sparkle-project.org" -a "$SPARKLE_ACCOUNT" > /dev/null 2>&1; then
     echo "NG: Sparkle の EdDSA 秘密鍵（keychain account '${SPARKLE_ACCOUNT}'）が無い"
-    echo "    復元: build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account mycap -f ~/Library/CloudStorage/Dropbox/secrets/sparkle-ed25519-mycap-private.key"
+    echo "    復元: build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account capit -f ~/Library/CloudStorage/Dropbox/secrets/sparkle-ed25519-capit-private.key"
     exit 1
 fi
 

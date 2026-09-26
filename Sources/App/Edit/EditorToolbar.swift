@@ -7,11 +7,11 @@ final class EditorToolbar: NSObject, NSToolbarDelegate {
     /// タイトルバー込みの高さの目安（ウィンドウの初期サイズの計算に使う）
     static let height: CGFloat = 52
 
-    private static let center = NSToolbarItem.Identifier("mycap.edit.center")
-    private static let actions = NSToolbarItem.Identifier("mycap.edit.actions")
+    private static let center = NSToolbarItem.Identifier("capit.edit.center")
+    private static let actions = NSToolbarItem.Identifier("capit.edit.actions")
 
     private let model: EditorModel
-    let toolbar = NSToolbar(identifier: "mycap.edit")
+    let toolbar = NSToolbar(identifier: "capit.edit")
 
     init(model: EditorModel) {
         self.model = model

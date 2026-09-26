@@ -1,6 +1,6 @@
 # Changelog
 
-mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) ベース、バージョニングは [SemVer](https://semver.org/lang/ja/)。
+Capit の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) ベース、バージョニングは [SemVer](https://semver.org/lang/ja/)。
 
 `scripts/release.sh` が `[Unreleased]` を `[X.Y.Z] - YYYY-MM-DD` に切り出し、そのセクションを GitHub Release のノートと Sparkle の更新ダイアログ（appcast の `<description>`）の両方に流し込む。ここが唯一の源。
 
@@ -39,10 +39,13 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 - **書く**: ユーザーが目で見て・触って気づく変更だけ（キャプチャ・サムネイル・ピン・OCR・編集・録画・キャプチャ履歴の挙動、ホットキー、メニュー）
 - **書かない**: 内部リファクタ・テスト・ドキュメント・ビルド/リリーススクリプト・CI・依存の更新
-- dev 版（mycap Dev）にしか影響しない変更も書かない
+- dev 版（Capit Dev）にしか影響しない変更も書かない
 - 該当するものが無いリリース（配布基盤だけの修正など）は「- 内部的な変更のみ」と 1 行書く
 
 ## [Unreleased]
+
+### 📝 Changed
+- アプリ名を mycap から Capit に変更（キャッシュ・履歴・前回の設定は引き継がない。画面収録の許可は付け直しが必要）
 
 ## [0.6.0] - 2026-09-26
 

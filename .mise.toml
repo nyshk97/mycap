@@ -7,24 +7,24 @@ description = "keychain の Developer ID から署名用 xcconfig を書き出�
 run = "bash scripts/gen-signing-xcconfig.sh && xcodegen generate --quiet"
 
 [tasks.build]
-description = "Debug（mycap Dev）をビルドする"
+description = "Debug（Capit Dev）をビルドする"
 run = """
 set -eo pipefail
 mise run gen
 # Claude Code のセッション（CLAUDECODE）からは証明書で署名しない（会社貸与 PC で keychain に触らない）。コマンドライン指定は xcconfig より優先される
 SESSION_SIGN=""; [ -n "${CLAUDECODE:-}" ] && SESSION_SIGN="CODE_SIGN_IDENTITY=-"
-xcodebuild -project mycap.xcodeproj -scheme mycap -configuration Debug -derivedDataPath build $SESSION_SIGN build > build/xcodebuild-debug.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-debug.log | head -40; exit 1; }
+xcodebuild -project capit.xcodeproj -scheme capit -configuration Debug -derivedDataPath build $SESSION_SIGN build > build/xcodebuild-debug.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-debug.log | head -40; exit 1; }
 grep -E '\\*\\* BUILD' build/xcodebuild-debug.log
 """
 
 [tasks.build-release]
-description = "Release（mycap）をビルドする"
+description = "Release（Capit）をビルドする"
 run = """
 set -eo pipefail
 mise run gen
 # Claude Code のセッション（CLAUDECODE）からは証明書で署名しない（会社貸与 PC で keychain に触らない）。コマンドライン指定は xcconfig より優先される
 SESSION_SIGN=""; [ -n "${CLAUDECODE:-}" ] && SESSION_SIGN="CODE_SIGN_IDENTITY=-"
-xcodebuild -project mycap.xcodeproj -scheme mycap -configuration Release -derivedDataPath build $SESSION_SIGN build > build/xcodebuild-release.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-release.log | head -40; exit 1; }
+xcodebuild -project capit.xcodeproj -scheme capit -configuration Release -derivedDataPath build $SESSION_SIGN build > build/xcodebuild-release.log 2>&1 || { grep -E 'error:|\\*\\* BUILD' build/xcodebuild-release.log | head -40; exit 1; }
 grep -E '\\*\\* BUILD' build/xcodebuild-release.log
 """
 
@@ -35,25 +35,25 @@ set -eo pipefail
 mise run gen
 # Claude Code のセッション（CLAUDECODE）からは証明書で署名しない（会社貸与 PC で keychain に触らない）。コマンドライン指定は xcconfig より優先される
 SESSION_SIGN=""; [ -n "${CLAUDECODE:-}" ] && SESSION_SIGN="CODE_SIGN_IDENTITY=-"
-xcodebuild -project mycap.xcodeproj -scheme mycap -derivedDataPath build $SESSION_SIGN test > build/xcodebuild-test.log 2>&1 || { grep -E 'error:|failed|\\*\\* TEST' build/xcodebuild-test.log | head -60; exit 1; }
+xcodebuild -project capit.xcodeproj -scheme capit -derivedDataPath build $SESSION_SIGN test > build/xcodebuild-test.log 2>&1 || { grep -E 'error:|failed|\\*\\* TEST' build/xcodebuild-test.log | head -60; exit 1; }
 grep -E 'Executed|\\*\\* TEST' build/xcodebuild-test.log | tail -3
 """
 
 [tasks.run]
-description = "dev ビルドを /Applications/mycap Dev.app に置いて起動し直す（既存の dev プロセスは終了させる）"
+description = "dev ビルドを /Applications/Capit Dev.app に置いて起動し直す（既存の dev プロセスは終了させる）"
 run = "mise run build && bash scripts/install-app.sh Debug"
 
 [tasks.install]
-description = "Release ビルドを /Applications/mycap.app に置いて起動し直す（配布物の再署名・notarize は通らない。Sparkle の更新経路の確認には mise run release の配布物を使う）"
+description = "Release ビルドを /Applications/Capit.app に置いて起動し直す（配布物の再署名・notarize は通らない。Sparkle の更新経路の確認には mise run release の配布物を使う）"
 run = "mise run build-release && bash scripts/install-app.sh Release"
 
 [tasks.log]
 description = "dev 版のログを follow する"
-run = "tail -f ~/Library/Logs/mycap/mycap-dev.log"
+run = "tail -f ~/Library/Logs/capit/capit-dev.log"
 
 [tasks.log-prod]
 description = "常用版のログを follow する"
-run = "tail -f ~/Library/Logs/mycap/mycap.log"
+run = "tail -f ~/Library/Logs/capit/capit.log"
 
 [tasks."release:preflight"]
 description = "リリース前チェックだけを実行する"

@@ -48,7 +48,7 @@ enum CaptureStore {
 
     // MARK: - 撮ったときに前面だったアプリ（拡張属性に持つ）
 
-    private static let sourceAppKey = "io.github.nyshk97.mycap.source-app"
+    private static let sourceAppKey = "io.github.nyshk97.capit.source-app"
 
     static func setSourceApp(_ bundleID: String, of url: URL) {
         let data = Array(bundleID.utf8)

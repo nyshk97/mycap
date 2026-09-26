@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// 全画面（マウスのあるディスプレイ）を ScreenCaptureKit で撮る。
 /// `screencapture -D <n>` の番号と NSScreen の対応はマルチディスプレイで確かめにくいので、ディスプレイ ID で引ける SCK にした。
-/// mycap 自身のウィンドウ（サムネイル・トースト）は写さない。
+/// Capit 自身のウィンドウ（サムネイル・トースト）は写さない。
 /// `rect`（ディスプレイ内の左上原点のポイント）を渡すとその範囲だけ撮る（前回と同じ範囲）
 enum FullScreenCapturer {
     static func capture(screen: NSScreen, rect: CGRect? = nil, completion: @escaping (URL?) -> Void) {
@@ -31,7 +31,7 @@ enum FullScreenCapturer {
                     Log.write("capture.full.failed error=\(String(describing: error))")
                     return finish(nil)
                 }
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).png")
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("capit-\(UUID().uuidString).png")
                 finish(writePNG(image, scale: scale, to: url) ? url : nil)
             }
         }

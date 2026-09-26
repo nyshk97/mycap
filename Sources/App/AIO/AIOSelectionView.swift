@@ -155,7 +155,7 @@ final class AIOSelectionView: NSView {
 
     // MARK: - カーソル
 
-    /// mycap は前面にならないので cursor rect が効かないことがある。マウスの移動のたびに自分で切り替える
+    /// Capit は前面にならないので cursor rect が効かないことがある。マウスの移動のたびに自分で切り替える
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)

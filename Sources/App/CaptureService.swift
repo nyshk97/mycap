@@ -165,7 +165,7 @@ final class CaptureService {
     /// 検証フック `--ingest`: 既存の画像（または mp4）を撮影結果として同じ経路に流す
     func ingest(path: String) {
         let ext = URL(fileURLWithPath: path).pathExtension.lowercased() == "mp4" ? "mp4" : "png"
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).\(ext)")
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("capit-\(UUID().uuidString).\(ext)")
         do {
             try FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: tmp)
         } catch {

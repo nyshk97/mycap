@@ -1,7 +1,7 @@
 import AppKit
 
 /// 録画・スクロールキャプチャのバーのボタン（色付きの角丸・アイコン＋ラベル）。
-/// mycap をアクティブにしないパネルの上なので、1 回目のクリックで押せるよう acceptsFirstMouse を返す
+/// Capit をアクティブにしないパネルの上なので、1 回目のクリックで押せるよう acceptsFirstMouse を返す
 final class BarButton: NSView {
     private let onPress: () -> Void
     private let color: NSColor

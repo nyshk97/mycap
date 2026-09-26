@@ -1,6 +1,6 @@
 import Foundation
 
-/// open 経由の起動では stdout を捕捉できないため、~/Library/Logs/mycap/ に追記する。
+/// open 経由の起動では stdout を捕捉できないため、~/Library/Logs/capit/ に追記する。
 /// 先頭の語はイベント名（`launch` `hotkey.registered` 等）で固定し、grep で検証できるようにする
 enum Log {
     private static let formatter: DateFormatter = {
@@ -8,7 +8,7 @@ enum Log {
         f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         return f
     }()
-    private static let queue = DispatchQueue(label: "mycap.log")
+    private static let queue = DispatchQueue(label: "capit.log")
 
     static func write(_ message: String) {
         let line = "\(formatter.string(from: Date())) \(message)\n"

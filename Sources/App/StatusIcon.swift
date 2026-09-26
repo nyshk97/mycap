@@ -24,7 +24,7 @@ enum StatusIcon {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "mycap"
+        image.accessibilityDescription = "Capit"
         return image
     }
 }

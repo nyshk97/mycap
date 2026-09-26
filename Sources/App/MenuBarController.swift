@@ -66,7 +66,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// ホットキーの登録失敗・CleanShot X の起動中は警告アイコンにする
     private func refreshIcon() {
         if !app.failedHotKeys.isEmpty || app.isCleanShotRunning {
-            let image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "mycap")
+            let image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "Capit")
             image?.isTemplate = true
             statusItem.button?.image = image
         } else {
@@ -130,7 +130,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let version = NSMenuItem(title: Env.versionLabel, action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(version)
-        let about = NSMenuItem(title: "mycap について", action: #selector(showAbout(_:)), keyEquivalent: "")
+        let about = NSMenuItem(title: "Capit について", action: #selector(showAbout(_:)), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
         #if !DEBUG

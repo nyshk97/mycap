@@ -1,4 +1,4 @@
-name: mycap
+name: capit
 options:
   deploymentTarget:
     macOS: "26.0"
@@ -13,7 +13,7 @@ settings:
     MARKETING_VERSION: 0.6.0
     CURRENT_PROJECT_VERSION: "$(MARKETING_VERSION)"
 targets:
-  mycap:
+  capit:
     type: application
     platform: macOS
     sources:
@@ -38,18 +38,18 @@ targets:
         DEVELOPMENT_TEAM: U4WAHGGBR7
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # scripts/make-release-zip.sh の再署名でも同じファイルを渡す
-        CODE_SIGN_ENTITLEMENTS: mycap.entitlements
+        CODE_SIGN_ENTITLEMENTS: capit.entitlements
       configs:
         # dev と常用は Bundle ID を分離する（TCC 権限・データ・Sparkle が独立し、併存しても衝突しない）
         Debug:
-          PRODUCT_BUNDLE_IDENTIFIER: io.github.nyshk97.mycap.dev
-          PRODUCT_NAME: mycap Dev
+          PRODUCT_BUNDLE_IDENTIFIER: io.github.nyshk97.capit.dev
+          PRODUCT_NAME: Capit Dev
           ASSETCATALOG_COMPILER_APPICON_NAME: AppIconDev
         Release:
-          PRODUCT_BUNDLE_IDENTIFIER: io.github.nyshk97.mycap
-          PRODUCT_NAME: mycap
+          PRODUCT_BUNDLE_IDENTIFIER: io.github.nyshk97.capit
+          PRODUCT_NAME: Capit
           # feed は Release だけ。dev 版に入れると更新チェックで常用版のビルドに置き換わる
-          MYCAP_SU_FEED_URL: https://github.com/nyshk97/mycap/releases/latest/download/appcast.xml
+          CAPIT_SU_FEED_URL: https://github.com/nyshk97/capit/releases/latest/download/appcast.xml
           ENABLE_HARDENED_RUNTIME: YES
           OTHER_CODE_SIGN_FLAGS: --timestamp
           # 素の xcodebuild build が get-task-allow を注入して notarize が Invalid になるのを防ぐ
@@ -70,12 +70,12 @@ targets:
         # 録画にマイクを入れるとき（オールインワンのツールバーのトグル）
         NSMicrophoneUsageDescription: 録画にマイクの音声を入れるために使います。
         # Sparkle。アップデータの起動は #if !DEBUG でガードし、feed URL も Release 構成にだけ
-        # 入れる二重防御（Debug では MYCAP_SU_FEED_URL が未定義で空文字になる）
-        SUFeedURL: $(MYCAP_SU_FEED_URL)
+        # 入れる二重防御（Debug では CAPIT_SU_FEED_URL が未定義で空文字になる）
+        SUFeedURL: $(CAPIT_SU_FEED_URL)
         SUEnableAutomaticChecks: true
-        # keychain の Sparkle 鍵（account "mycap"）と対。generate_keys --account mycap の出力を書く
+        # keychain の Sparkle 鍵（account "capit"）と対。generate_keys --account capit の出力を書く
         SUPublicEDKey: Xal3F2sjXCGemM1fMW0ifL5K22ec+oQZWrdY/Z42Vdg=
-  mycapTests:
+  capitTests:
     type: bundle.unit-test
     platform: macOS
     # アプリをホストにせず、純粋関数（Sources/Core）だけを直接コンパイルしてテストする。
@@ -87,16 +87,16 @@ targets:
       base:
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.nyshk97.mycap.tests
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.nyshk97.capit.tests
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  mycap:
+  capit:
     build:
       targets:
-        mycap: all
+        capit: all
     run:
       config: Debug
     test:
       config: Debug
       targets:
-        - mycapTests
+        - capitTests

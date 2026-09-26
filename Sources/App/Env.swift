@@ -1,15 +1,15 @@
 import Foundation
 
-/// dev 版（mycap Dev）と常用版で変わる値をまとめる
+/// dev 版（Capit Dev）と常用版で変わる値をまとめる
 enum Env {
     #if DEBUG
     static let isDev = true
-    static let logFileName = "mycap-dev.log"
-    static let cacheDirName = "mycap-dev"
+    static let logFileName = "capit-dev.log"
+    static let cacheDirName = "capit-dev"
     #else
     static let isDev = false
-    static let logFileName = "mycap.log"
-    static let cacheDirName = "mycap"
+    static let logFileName = "capit.log"
+    static let cacheDirName = "capit"
     #endif
 
     static var version: String {
@@ -17,7 +17,7 @@ enum Env {
     }
 
     static var versionLabel: String {
-        isDev ? "mycap v\(version) (dev)" : "mycap v\(version)"
+        isDev ? "Capit v\(version) (dev)" : "Capit v\(version)"
     }
 
     /// 撮った直後の置き場（サムネイルで「保存」を押すまで）。dev と常用で分ける
@@ -25,29 +25,29 @@ enum Env {
         .appendingPathComponent(cacheDirName, isDirectory: true)
 
     /// サムネイルで「保存」を押したときの保存先（固定値。CleanShot X と同じ ~/Downloads）。
-    /// dev 版だけ `MYCAP_SAVE_DIR` で差し替えられる（検証で ~/Downloads を汚さないため）
+    /// dev 版だけ `CAPIT_SAVE_DIR` で差し替えられる（検証で ~/Downloads を汚さないため）
     static let saveDir: URL = {
         #if DEBUG
-        if let override = ProcessInfo.processInfo.environment["MYCAP_SAVE_DIR"], !override.isEmpty {
+        if let override = ProcessInfo.processInfo.environment["CAPIT_SAVE_DIR"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         #endif
         return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
     }()
 
-    /// 撮った直後のサムネイルがキーを受ける「待ち受け」の長さ（秒）。dev 版だけ `MYCAP_ARM_SECONDS` で短くできる
+    /// 撮った直後のサムネイルがキーを受ける「待ち受け」の長さ（秒）。dev 版だけ `CAPIT_ARM_SECONDS` で短くできる
     static let armSeconds: TimeInterval = {
         #if DEBUG
-        if let v = ProcessInfo.processInfo.environment["MYCAP_ARM_SECONDS"].flatMap(Double.init), v > 0 { return v }
+        if let v = ProcessInfo.processInfo.environment["CAPIT_ARM_SECONDS"].flatMap(Double.init), v > 0 { return v }
         #endif
         return 5
     }()
 
-    /// 待ち受けでキー（Esc・⌘C 等）を取るか。dev 版だけ `MYCAP_ARM_KEYS=0` で取らない
+    /// 待ち受けでキー（Esc・⌘C 等）を取るか。dev 版だけ `CAPIT_ARM_KEYS=0` で取らない
     /// （検証フックでサムネイルを出すたびに、ユーザーの ⌘C / Esc / ⌘S を奪わないため）
     static let armKeys: Bool = {
         #if DEBUG
-        return ProcessInfo.processInfo.environment["MYCAP_ARM_KEYS"] != "0"
+        return ProcessInfo.processInfo.environment["CAPIT_ARM_KEYS"] != "0"
         #else
         return true
         #endif
@@ -55,7 +55,7 @@ enum Env {
 
     static let logURL: URL = {
         let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Logs/mycap", isDirectory: true)
+            .appendingPathComponent("Logs/capit", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent(logFileName)
     }()

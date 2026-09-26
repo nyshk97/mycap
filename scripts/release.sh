@@ -1,5 +1,5 @@
 #!/bin/bash
-# mycap リリーススクリプト
+# Capit リリーススクリプト
 # 使い方: ./scripts/release.sh [patch|minor|major|<x.y.z>]   （省略時は patch）
 #
 # 0. preflight.sh（main / clean / push 済み / タグと Release が未作成 / 資格情報 / CHANGELOG / 画面ロック）
@@ -10,7 +10,7 @@
 # 4. zip に Sparkle の EdDSA 署名を付けて dist/appcast.xml を生成（CHANGELOG を <description> に）
 # 5. bump commit を main に push
 # 6. GitHub Release（v<version>）を作成し zip と appcast.xml を添付（ノートは CHANGELOG から）
-# 7. nyshk97/homebrew-tap の Casks/mycap.rb を更新し、ローカルの tap を同期
+# 7. nyshk97/homebrew-tap の Casks/capit.rb を更新し、ローカルの tap を同期
 #
 # notarize（失敗しやすい工程）を push より前に置く。bump はビルド前にローカルで commit する。
 # push までに失敗したら trap がその commit を巻き戻すので、remote には何も反映されず
@@ -21,13 +21,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 
-APP_NAME="mycap"
-GITHUB_REPO="nyshk97/mycap"
+APP_NAME="Capit"
+GITHUB_REPO="nyshk97/capit"
 TAP_REPO="nyshk97/homebrew-tap"
-CASK_TOKEN="mycap"
+CASK_TOKEN="capit"
 CASK_PATH="Casks/${CASK_TOKEN}.rb"
-# Sparkle の鍵は keychain の account "mycap"（アプリごとに分ける）。SUPublicEDKey と対になっているので変えない。
-SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-mycap}"
+# Sparkle の鍵は keychain の account "capit"（アプリごとに分ける）。SUPublicEDKey と対になっているので変えない。
+SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-capit}"
 SIGN_UPDATE="$REPO_ROOT/build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
 CHANGELOG_PY="$REPO_ROOT/scripts/changelog.py"
 APPCAST="$REPO_ROOT/dist/appcast.xml"
@@ -46,7 +46,7 @@ case "$BUMP" in
 esac
 NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 TAG="v$NEW_VERSION"
-DIST_ZIP="$REPO_ROOT/dist/mycap-$NEW_VERSION.zip"
+DIST_ZIP="$REPO_ROOT/dist/capit-$NEW_VERSION.zip"
 echo "現在のバージョン: ${CURRENT_VERSION} → 新しいバージョン: ${NEW_VERSION}"
 
 # ===== preflight =====
@@ -83,7 +83,7 @@ RELEASE_NOTES_MD="$REPO_ROOT/dist/release-notes-$NEW_VERSION.md"
 SPARKLE_DESC_HTML="$REPO_ROOT/dist/sparkle-description-$NEW_VERSION.html"
 python3 "$CHANGELOG_PY" notes "$NEW_VERSION" "$RELEASE_NOTES_MD" "$SPARKLE_DESC_HTML"
 PUBDATE=$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")
-DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$TAG/mycap-$NEW_VERSION.zip"
+DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$TAG/capit-$NEW_VERSION.zip"
 RELEASE_URL="https://github.com/$GITHUB_REPO/releases/tag/$TAG"
 # 1 item だけでよい: feed は releases/latest/download/appcast.xml で常に最新 Release の物を指す。
 # CFBundleVersion = MARKETING_VERSION なので sparkle:version もそれ。
@@ -127,7 +127,7 @@ cask "$CASK_TOKEN" do
   version "$NEW_VERSION"
   sha256 "$SHA256"
 
-  url "https://github.com/$GITHUB_REPO/releases/download/v#{version}/mycap-#{version}.zip"
+  url "https://github.com/$GITHUB_REPO/releases/download/v#{version}/capit-#{version}.zip"
   name "$APP_NAME"
   desc "Personal screenshot tool: capture, OCR, pin and screen recording"
   homepage "https://github.com/$GITHUB_REPO"
@@ -135,7 +135,7 @@ cask "$CASK_TOKEN" do
   auto_updates true
   depends_on macos: :tahoe
 
-  app "mycap.app"
+  app "Capit.app"
 end
 CASK
 )"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# dist/mycap-<version>.zip を notarize して staple 済みの zip に差し替える
+# dist/capit-<version>.zip を notarize して staple 済みの zip に差し替える
 #
 # 資格情報は `xcrun notarytool store-credentials <プロファイル名>` で作った keychain
 # プロファイル（既定 "nyshk97-notary"。自作 Mac アプリ全体で共通）を使う。中身は
@@ -14,10 +14,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PROFILE="${NOTARY_PROFILE:-nyshk97-notary}"
-APP="build/Build/Products/Release/mycap.app"
+APP="build/Build/Products/Release/Capit.app"
 [ -d "$APP" ] || { echo "NG: $APP がない（先に mise run release:zip）"; exit 1; }
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
-ZIP="dist/mycap-$VERSION.zip"
+ZIP="dist/capit-$VERSION.zip"
 [ -f "$ZIP" ] || { echo "NG: $ZIP がない（先に mise run release:zip）"; exit 1; }
 
 xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait
@@ -26,16 +26,16 @@ xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait
 # （release.sh は zip をそのまま配布するため、zip 側に入れる必要がある）。
 STAPLE_DIR=$(mktemp -d)
 ditto -x -k "$ZIP" "$STAPLE_DIR"
-xcrun stapler staple "$STAPLE_DIR/mycap.app"
+xcrun stapler staple "$STAPLE_DIR/Capit.app"
 
-assess=$(spctl --assess --type execute -vv "$STAPLE_DIR/mycap.app" 2>&1)
+assess=$(spctl --assess --type execute -vv "$STAPLE_DIR/Capit.app" 2>&1)
 case "$assess" in
     *"Notarized Developer ID"*) ;;
     *) echo "NG: Gatekeeper 評価が通らない: $assess"; exit 1 ;;
 esac
 
 /bin/rm -f "$ZIP" 2>/dev/null || true
-ditto -c -k --sequesterRsrc --keepParent "$STAPLE_DIR/mycap.app" "$ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$STAPLE_DIR/Capit.app" "$ZIP"
 /bin/rm -rf "$STAPLE_DIR" 2>/dev/null || true
 
 echo "OK: ${ZIP}（notarize + staple 済み。$(echo "$assess" | grep '^source=')）"

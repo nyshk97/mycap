@@ -5,7 +5,7 @@ import ScreenCaptureKit
 /// 動画録画。オールインワン（⌘⇧5）で選んだ範囲を、3 秒のカウントダウンのあと
 /// SCRecordingOutput で mp4（1x・H.264・30fps・カーソルあり）に書く。音声（マイク・システム音）は `RecordingAudio` のとおり。
 /// 両方入れて別トラックに書かれたら、停止後に `AudioMixer` で 1 トラックへ混ぜ直す。
-/// 録画中は範囲の外側に枠と停止バーを出す（mycap のウィンドウはフィルタで外すうえ、枠は範囲の外なので写らない）
+/// 録画中は範囲の外側に枠と停止バーを出す（Capit のウィンドウはフィルタで外すうえ、枠は範囲の外なので写らない）
 final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
     /// countdown はマイクの許可の返事を待つ間も含む。finishing は停止後に音声を混ぜ直している間
     enum State: String { case idle, countdown, recording, stopping, finishing }
@@ -130,7 +130,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         config.excludesCurrentProcessAudio = true
         config.captureMicrophone = audio.mic
 
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).mp4")
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("capit-\(UUID().uuidString).mp4")
         let rc = SCRecordingOutputConfiguration()
         rc.outputURL = tmp
         rc.outputFileType = .mp4
@@ -161,7 +161,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
                 }
                 self.startedAt = Date()
                 self.state = .recording
-                // システム音からは mycap 自身の音を除いている（excludesCurrentProcessAudio）ので、開始音は動画に入らない
+                // システム音からは Capit 自身の音を除いている（excludesCurrentProcessAudio）ので、開始音は動画に入らない
                 Sounds.playRecordStart()
                 if let rect {
                     let global = AIOLayout.global(rect, screenFrame: screen.frame)

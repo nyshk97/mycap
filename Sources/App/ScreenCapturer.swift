@@ -22,7 +22,7 @@ final class ScreenCapturer {
         }
         Self.logPermission(when: "before_capture")
         let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("mycap-\(UUID().uuidString).png")
+            .appendingPathComponent("capit-\(UUID().uuidString).png")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         switch mode {

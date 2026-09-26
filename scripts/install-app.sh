@@ -10,8 +10,8 @@ cd "$(dirname "$0")/.."
 
 CONFIG="${1:?Debug|Release}"
 case "$CONFIG" in
-  Debug) NAME="mycap Dev" ;;
-  Release) NAME="mycap" ;;
+  Debug) NAME="Capit Dev" ;;
+  Release) NAME="Capit" ;;
   *) echo "NG: Debug か Release を指定する" >&2; exit 1 ;;
 esac
 SRC="build/Build/Products/$CONFIG/$NAME.app"

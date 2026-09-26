@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// 暗幕のパネル。アプリを前面にしないまま key になり、Esc・Enter・W / H の入力を受ける
-/// （mycap を前面にすると、元のアプリのウィンドウが非アクティブの見た目で写ってしまう）
+/// （Capit を前面にすると、元のアプリのウィンドウが非アクティブの見た目で写ってしまう）
 final class AIOPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }

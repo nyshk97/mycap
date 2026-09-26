@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
 
     /// dev 版の検証フック（`--tcc` 等）を既存インスタンスへ渡す通知名
-    static let commandNotification = Notification.Name((Bundle.main.bundleIdentifier ?? "mycap") + ".command")
+    static let commandNotification = Notification.Name((Bundle.main.bundleIdentifier ?? "capit") + ".command")
     static let cleanShotBundleID = "pl.maketheweb.cleanshotx"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -96,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 起動直後はこちらで気づかせ、以後はメニューバーのアイコンで気づけるようにする
             let alert = NSAlert()
             alert.messageText = "ホットキーを登録できませんでした"
-            alert.informativeText = "\(failedHotKeys.joined(separator: " / ")) は他のアプリ（CleanShot X 等）が使っている可能性があります。そのアプリを終了してから mycap を起動し直してください。"
+            alert.informativeText = "\(failedHotKeys.joined(separator: " / ")) は他のアプリ（CleanShot X 等）が使っている可能性があります。そのアプリを終了してから Capit を起動し直してください。"
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
@@ -166,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--remember-region <x> <y> <w> <h>`: マウスのある画面の範囲（左上原点のポイント）を「前回の範囲」にする
     /// `--last-region`: 前回と同じ範囲を撮る（選択 UI が出ないのでフックにできる。許可が要る）
     /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
-    /// `--save-newest`: 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えてから）
+    /// `--save-newest`: 最新のサムネイルの「保存」を押す（保存先は CAPIT_SAVE_DIR で差し替えてから）
     /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc・⌘C 等のキーは取らない）
     /// `--snapshot <png>`: 最新のサムネイルをプロセス内描画で PNG にする
     /// `--close-all`: サムネイルを全部閉じる
@@ -227,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--unhover":
                 capture.thumbnails.hoverNewest(false)
             case "--snapshot":
-                let path = arg() ?? "/tmp/mycap-snapshot.png"
+                let path = arg() ?? "/tmp/capit-snapshot.png"
                 Log.write("hook.snapshot path=\(path) ok=\(capture.thumbnails.snapshotNewest(to: path))")
             case "--close-all":
                 capture.thumbnails.closeAll()
@@ -262,7 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--edit-dump":
                 Log.write("hook.edit \(capture.editor.dump())")
             case "--edit-snapshot":
-                let path = arg() ?? "/tmp/mycap-edit.png"
+                let path = arg() ?? "/tmp/capit-edit.png"
                 Log.write("hook.edit_snapshot path=\(path) ok=\(capture.editor.snapshot(to: path))")
             case "--edit-save":
                 capture.editor.save()
@@ -281,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case "--aio-snapshot":
                 if let r = rectArg() {
-                    let path = arg() ?? "/tmp/mycap-aio.png"
+                    let path = arg() ?? "/tmp/capit-aio.png"
                     Log.write("hook.aio_snapshot path=\(path) ok=\(capture.aio.snapshot(rect: r, to: path))")
                 }
             case "--scroll-frames":
@@ -293,11 +293,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case "--scroll-overlay-snapshot":
                 if let r = rectArg() {
-                    let path = arg() ?? "/tmp/mycap-scroll-overlay.png"
+                    let path = arg() ?? "/tmp/capit-scroll-overlay.png"
                     Log.write("hook.scroll_overlay_snapshot path=\(path) ok=\(ScrollOverlay.snapshot(rect: r, screen: .underMouse, to: path))")
                 }
             case "--record-bar-snapshot":
-                let path = arg() ?? "/tmp/mycap-record-bar.png"
+                let path = arg() ?? "/tmp/capit-record-bar.png"
                 Log.write("hook.record_bar_snapshot path=\(path) ok=\(RecordingBar.snapshot(to: path))")
             case "--record-stop-bar":
                 capture.recorder.stop(reason: "bar")
@@ -344,7 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "--history-restore":
                 capture.history.restoreFocused()
             case "--history-snapshot":
-                let path = arg() ?? "/tmp/mycap-history.png"
+                let path = arg() ?? "/tmp/capit-history.png"
                 Log.write("hook.history_snapshot path=\(path) ok=\(capture.history.snapshot(to: path))")
             case "--history-close":
                 capture.history.close(.hook)

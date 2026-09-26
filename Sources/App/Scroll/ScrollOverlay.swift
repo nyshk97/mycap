@@ -1,7 +1,7 @@
 import AppKit
 
 /// スクロールキャプチャ中の表示: 範囲の外周の枠、Done / Cancel のバー、つないだ画像のライブプレビュー。
-/// どれも mycap のウィンドウなので、撮影のフィルタで外れて写らない。枠とプレビューはマウスを素通しにする（範囲の中でスクロールできるように）
+/// どれも Capit のウィンドウなので、撮影のフィルタで外れて写らない。枠とプレビューはマウスを素通しにする（範囲の中でスクロールできるように）
 final class ScrollOverlay {
     private let border = RecordingFrame()
     private var barPanel: NSPanel?

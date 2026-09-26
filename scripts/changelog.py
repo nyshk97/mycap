@@ -15,7 +15,7 @@ import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = REPO_ROOT / "docs" / "CHANGELOG.md"
-APP_NAME = "mycap"
+APP_NAME = "Capit"
 
 HEADING_RE = re.compile(r"^## \[([^\]]+)\]")
 

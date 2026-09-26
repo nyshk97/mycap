@@ -1,7 +1,7 @@
 import AppKit
 
 /// 録画中に範囲の右下の外へ出す小さなバー。赤い ● と経過時間、■ 停止ボタン。
-/// 置き場が無ければ右上の外 → 範囲の内側の右下（`AIOLayout.recordingBarOrigin`）。mycap のウィンドウは録画のフィルタで外すので、内側でも写らない
+/// 置き場が無ければ右上の外 → 範囲の内側の右下（`AIOLayout.recordingBarOrigin`）。Capit のウィンドウは録画のフィルタで外すので、内側でも写らない
 final class RecordingBar {
     private var panel: NSPanel?
     private var timeLabel: NSTextField?

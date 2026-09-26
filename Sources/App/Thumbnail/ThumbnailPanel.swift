@@ -335,7 +335,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
     }
 
     /// 待ち受けに入る／解く。画像は隠さず枠だけ光らせる（撮った中身を確かめたいのはこの瞬間なので）。
-    /// `grabKeys: false` は検証用の起動（`MYCAP_ARM_KEYS=0`）
+    /// `grabKeys: false` は検証用の起動（`CAPIT_ARM_KEYS=0`）
     func setArmed(_ armed: Bool, grabKeys: Bool) {
         isArmed = armed
         applyBorder()

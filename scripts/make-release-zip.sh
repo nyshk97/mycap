@@ -1,5 +1,5 @@
 #!/bin/bash
-# Release ビルドを配布適格に再署名して dist/mycap-<version>.zip を作る
+# Release ビルドを配布適格に再署名して dist/capit-<version>.zip を作る
 #
 # 背景: xcodebuild build は埋め込んだ Sparkle.framework の外側しか再署名せず、
 # 内部の XPC サービス等が adhoc 署名のまま残り notarization が Invalid になる。
@@ -18,7 +18,7 @@ if [ -z "$IDENTITY" ]; then
     echo "    Xcode → Settings → Accounts → Manage Certificates から取得する" >&2
     exit 1
 fi
-APP="build/Build/Products/Release/mycap.app"
+APP="build/Build/Products/Release/Capit.app"
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
 
 mise run build-release >/dev/null
@@ -34,7 +34,7 @@ for nested in \
     codesign --force --options runtime --timestamp \
         --preserve-metadata=entitlements --sign "$IDENTITY" "$nested"
 done
-codesign --force --options runtime --timestamp --entitlements mycap.entitlements --sign "$IDENTITY" "$APP"
+codesign --force --options runtime --timestamp --entitlements capit.entitlements --sign "$IDENTITY" "$APP"
 
 # 検証: adhoc が残っていないこと・secure timestamp があること・get-task-allow がないこと
 fail=0
@@ -62,7 +62,7 @@ codesign --verify --deep --strict "$APP" || fail=1
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
 mkdir -p dist
-ZIP="dist/mycap-$VERSION.zip"
+ZIP="dist/capit-$VERSION.zip"
 /bin/rm -f "$ZIP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
