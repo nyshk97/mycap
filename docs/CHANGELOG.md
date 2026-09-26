@@ -44,6 +44,9 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### 🐛 Fixed
+- 範囲をドラッグして撮っても「前回の範囲がありません」になり、⌘⇧6 で前回と同じ範囲を撮れなかったのを修正
+
 ## [0.2.0] - 2026-09-26
 
 ### ✨ Added
