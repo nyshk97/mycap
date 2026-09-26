@@ -44,6 +44,8 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-26
+
 ### 📝 Changed
 - 撮った直後のサムネイルは、マウスを乗せなくても 5 秒間 Esc / ⌘C / ⌘S / ⌘O / ⌘E / ⌘P を受けるように変更（その間は枠が光る）
 - ピン留めしたらサムネイルを閉じるように変更
