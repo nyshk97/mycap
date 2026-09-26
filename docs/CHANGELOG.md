@@ -44,6 +44,8 @@ Capit の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-26
+
 ### 📝 Changed
 - 正式版として 1.0.0 に（機能の変更なし）
 
