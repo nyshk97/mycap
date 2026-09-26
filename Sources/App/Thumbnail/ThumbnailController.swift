@@ -54,25 +54,26 @@ final class ThumbnailController {
         let size = ThumbnailLayout.panelSize(for: image.size)
         var panel: ThumbnailPanel!
         let actions = ThumbnailView.Actions(
-            copy: {
+            copy: { [weak self] in
                 ImageClipboard.copy(url)
                 Toast.shared.show("コピーしました")
+                self?.close(panel, reason: "copied")
             },
-            save: {
+            save: { [weak self] in
                 guard let saved = CaptureStore.save(url) else {
                     Toast.shared.show("保存できませんでした: \(Env.saveDir.path)")
-                    return nil
+                    return
                 }
                 Log.write("thumbnail.saved name=\(saved.lastPathComponent) dir=\(saved.deletingLastPathComponent().path)")
                 Toast.shared.show("保存しました: \(saved.lastPathComponent)")
-                return saved
+                self?.close(panel, reason: "saved")
             },
-            revealInFinder: { saved in NSWorkspace.shared.activateFileViewerSelecting([saved]) },
-            pin: { [weak self] in
-                self?.onPin?(url)
-                self?.close(panel, reason: "pinned")
+            pin: { [weak self] in self?.onPin?(url) },
+            ocr: { [weak self] in
+                // 認識はキャッシュのファイルから非同期に行うので、先に閉じてよい（結果はトーストで出る）
+                OCR.recognizeAndCopy(url: url, source: "thumbnail")
+                self?.close(panel, reason: "ocr")
             },
-            ocr: { OCR.recognizeAndCopy(url: url, source: "thumbnail") },
             style: { [weak self] in self?.onStyle?(url) },
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }
@@ -146,7 +147,7 @@ final class ThumbnailController {
 
     /// 最新が先頭。`name screen frame hovered` を返す
     func dump() -> [String] {
-        items.map { "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\($0.panel.thumbnailView.isHovered) saved=\($0.panel.thumbnailView.savedURL?.lastPathComponent ?? "-")" }
+        items.map { "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\($0.panel.thumbnailView.isHovered)" }
     }
 
     /// 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えて使う）

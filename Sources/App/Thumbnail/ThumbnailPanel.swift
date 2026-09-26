@@ -31,11 +31,10 @@ final class ThumbnailPanel: NSPanel {
 /// サムネイルの中身。画像・ホバー時のボタン・ドラッグでの持ち出し
 final class ThumbnailView: NSView, NSDraggingSource {
     struct Actions {
+        /// コピー・保存・OCR は済んだらサムネイルを閉じる（保存は失敗したら閉じない）。整形・ピン留めは閉じない
         var copy: () -> Void
-        /// ~/Downloads へ保存し、保存先を返す（失敗なら nil）
-        var save: () -> URL?
-        /// 保存したファイルを Finder で表示する
-        var revealInFinder: (URL) -> Void
+        /// ~/Downloads へ保存する
+        var save: () -> Void
         var pin: () -> Void
         var ocr: () -> Void
         var style: () -> Void
@@ -54,9 +53,6 @@ final class ThumbnailView: NSView, NSDraggingSource {
     /// ホバー中だけ取っているキー（Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P）の登録 id
     private var keyTokens: [UInt32] = []
     private(set) var isHovered = false
-    /// 「保存」を押して ~/Downloads に書いた先。保存後は Save が「Finder」（Finder で表示）に変わる
-    private(set) var savedURL: URL?
-    private var saveButton: PillButton?
 
     init(frame: NSRect, url: URL, image: NSImage, isVideo: Bool, actions: Actions) {
         self.url = url
@@ -116,8 +112,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
             corner(CircleButton("text.viewfinder", tip: "OCR（文字をコピー）（⌘O）") { [weak self] in self?.actions.ocr() }, left: false, top: false)
         }
 
-        let save = PillButton("Save", tip: "保存（~/Downloads）（⌘S）") { [weak self] in self?.pressSave() }
-        saveButton = save
+        let save = PillButton("Save", tip: "保存（~/Downloads）（⌘S）") { [weak self] in self?.actions.save() }
         let pills = isVideo ? [save] : [PillButton("Copy", tip: "コピー（⌘C）") { [weak self] in self?.actions.copy() }, save]
         let column = NSStackView(views: pills)
         column.orientation = .vertical
@@ -152,17 +147,8 @@ final class ThumbnailView: NSView, NSDraggingSource {
         addSubview(badge, positioned: .below, relativeTo: overlay)
     }
 
-    /// 未保存なら保存して、ボタンを「Finder で表示」に変える。保存済みなら Finder で表示する
-    func pressSave() {
-        if let savedURL {
-            actions.revealInFinder(savedURL)
-            return
-        }
-        guard let saved = actions.save() else { return }
-        savedURL = saved
-        saveButton?.setLabel("Finder")
-        saveButton?.toolTip = "Finder で表示（\(saved.lastPathComponent)）"
-    }
+    /// 検証フックの `--save-newest` 用
+    func pressSave() { actions.save() }
 
     // MARK: - ホバー
 
@@ -193,7 +179,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private func registerHoverKeys() {
         var keys: [(code: Int, mods: Int, name: String, run: () -> Void)] = [
             (kVK_Escape, 0, "esc", { [weak self] in self?.actions.close() }),
-            (kVK_ANSI_S, cmdKey, "cmd_s", { [weak self] in self?.pressSave() }),
+            (kVK_ANSI_S, cmdKey, "cmd_s", { [weak self] in self?.actions.save() }),
         ]
         if !isVideo {
             keys += [
@@ -329,7 +315,7 @@ private final class PillButton: ActionButton {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func setLabel(_ label: String) {
+    private func setLabel(_ label: String) {
         attributedTitle = NSAttributedString(string: label, attributes: [
             .font: Self.font, .foregroundColor: NSColor.black,
         ])
