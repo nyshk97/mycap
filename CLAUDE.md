@@ -23,6 +23,7 @@ CleanShot X のうち使っている機能（範囲・ウィンドウ・全画�
 `mise run signing`（証明書の解決）・`mise run release`・`generate_keys` / `sign_update` はユーザーが自分の Terminal で叩く。
 セッション（環境変数 `CLAUDECODE` が立っている）からの `mise run build` / `build-release` / `test` は、署名 xcconfig があっても xcodebuild に `CODE_SIGN_IDENTITY=-` を渡して ad-hoc にする（`.mise.toml`）。
 ad-hoc はリビルドごとに画面収録の許可が外れるので、許可が要る確認（実際に撮る）はユーザーが自分の Terminal で `mise run run` して行う。セッションの検証は検証フックとログで済ませる。
+個人 PC のセッションから dev 版を入れるときは `env -u CLAUDECODE mise run run` にする。Claude Code は子プロセスに環境変数 `CLAUDECODE=1` を渡し、`.mise.toml` はそれを見て ad-hoc 署名にする（会社貸与 PC で keychain に触らないため）。ad-hoc だとリビルドのたびに画面収録の許可が外れる。
 
 ## 構成
 
