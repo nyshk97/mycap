@@ -44,6 +44,8 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-26
+
 ### ✨ Added
 - オールインワン（⌘⇧5）の Scrolling でスクロールキャプチャを追加（範囲を選んで手でスクロールすると縦につなぎ、Done か ⌘⇧5 で 1 枚にする）
 - 録画にマイクと Mac の音を入れられるように（オールインワンのツールバーの Mic / Sound で切り替え、前回の選択を覚える）
