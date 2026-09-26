@@ -22,7 +22,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr` / `thumbnail.saved` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr` / `thumbnail.saved` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=esc|double_click|menu` / `pin.closed` / `pin.opacity` /
 `style.opened` / `style.exported px= bg= padding= corner= shadow=` / `style.render_failed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
@@ -31,7 +31,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 
 常駐中の dev に引数を渡す（2 個目のプロセスは引数を既存インスタンスへ転送して終了する）。
 撮ったものはキャッシュ（`~/Library/Caches/mycap-dev/`）に置かれ、サムネイルの「保存」で初めて保存先に書く。**保存先は `MYCAP_SAVE_DIR` で差し替えて起動し直してから撃つ**（`~/Downloads` を汚さない）。フックはクリップボードに書かない。
-キャッシュの掃除（24 時間）は、`touch -t` で古くしたファイルをキャッシュに置いて起動し直すと `cache.purged removed=1` になる。
+キャッシュの掃除（7 日）は、`touch -t $(date -v-8d +%Y%m%d%H%M)` で古くしたファイルをキャッシュに置いて起動し直すと `cache.purged removed=1` になる（`-v-2d` のものは残る）。
 
 ```bash
 S=<scratchpad>; mkdir -p $S/save $S/fx
@@ -50,6 +50,11 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --remember-region 100 80 400 300   # 前回の範囲（マウスのある画面・左上原点のポイント）→ region.remembered
 "${B[@]}" --last-region          # 前回と同じ範囲を撮る（許可が要る。144dpi なら 800×600 の capture.last_region.captured）
 "${B[@]}" --close-all
+# キャプチャ履歴（アクティブにしないで開く。動画の fixture は ffmpeg -f lavfi -i testsrc=size=640x360:rate=30 -t 3 -pix_fmt yuv420p clip.mp4）
+"${B[@]}" --history-open; "${B[@]}" --history-dump   # hook.history に kind / count / focus / 各項目の 名前|相対時刻|app=|icon=|thumb=|focused
+"${B[@]}" --history-focus 2 --history-kind videos --history-snapshot $S/history.png
+"${B[@]}" --history-restore      # フォーカス中をサムネイルに戻す → history.restored / thumbnail.added（同じファイルが出ていたら thumbnail.closed reason=restored_again）
+"${B[@]}" --history-close
 # OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）
@@ -65,6 +70,8 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 - `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
 - `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）
 - `--tcc`: 許可の状態をログに出すだけ
+- キャプチャ履歴の時刻はファイル名から取る（`--ingest` のコピーは作成日時が元ファイルのものになるため）。整形の出力（`_styled`）だけ作成日時。`--history-snapshot` はプロセス内描画なので、すりガラスの背景は灰色に写る
+- キャプチャ履歴のキー操作（←→ / Enter / Esc / Tab）・ホバー・ダブルクリック・外クリックで閉じる・閉じたあと元のアプリに戻るは、パネルを key にする必要がありフォーカスを奪うので、人間が ⌃⌥⌘3 で確かめる
 - 前回の範囲は `defaults read io.github.nyshk97.mycap.dev lastRegion` にある。確認後は `defaults delete` で消す（メニューの「前回と同じ範囲を撮る」が有効のまま残る）。⌘⇧4 のドラッグで覚える経路は `screencapture -i` が要るので人間が確かめる（ログの `region.remembered` / `region.remember_skipped reason=…`）
 - `--style-snapshot` はプレビューと背景の丸ボタンしか写らない（スライダー・トグル・ボタンの文字はプロセス内描画に出ない）。コントロールの見た目は実機で見る
 - フックを渡すだけの 2 個目のプロセスは `launch.forward_to_running` の 1 行だけを出して終わる（`thumbnail.*` 等が出たら、単一インスタンスの判定より前に何かを作っている）

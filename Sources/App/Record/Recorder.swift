@@ -21,6 +21,8 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
     private var tmpURL: URL?
     private var targetScreen: NSScreen = .underMouse
     private var stopReason = "user"
+    /// 履歴のアイコン用。ウィンドウを録るならその持ち主、画面なら picker を出す前の前面アプリ
+    private var sourceApp: String?
 
     /// ホットキー・メニューから
     func toggle() {
@@ -36,6 +38,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
     // MARK: - 対象を選ぶ
 
     private func pick() {
+        sourceApp = CaptureStore.frontmostAppID()
         let picker = SCContentSharingPicker.shared
         var config = SCContentSharingPickerConfiguration()
         config.allowedPickerModes = [.singleWindow, .singleDisplay]
@@ -80,6 +83,9 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
         guard state == .picking else { return }
         let isDisplay = pickerFilter.style == .display
         let displayID = pickerFilter.includedDisplays.first?.displayID
+        if !isDisplay, let owner = pickerFilter.includedWindows.first?.owningApplication?.bundleIdentifier {
+            sourceApp = owner
+        }
         targetScreen = displayID.flatMap(NSScreen.withID) ?? .underMouse
         Log.write("record.picked style=\(isDisplay ? "display" : "window") raw_style=\(pickerFilter.style.rawValue) displays=\(pickerFilter.includedDisplays.count) windows=\(pickerFilter.includedWindows.count) rect=\(NSStringFromRect(pickerFilter.contentRect))")
         state = .countdown
@@ -117,6 +123,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
     func startForTest(seconds: Double) {
         guard state == .idle else { return }
         targetScreen = .underMouse
+        sourceApp = CaptureStore.frontmostAppID()
         state = .countdown
         begin(SCContentFilter(), isDisplay: true, displayID: targetScreen.displayID)
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in self?.stop(reason: "test") }
@@ -227,7 +234,7 @@ final class Recorder: NSObject, SCContentSharingPickerObserver, SCStreamDelegate
             Toast.shared.show("録画を保存できませんでした")
             return
         }
-        guard let saved = CaptureStore.keep(tmp) else {
+        guard let saved = CaptureStore.keep(tmp, app: sourceApp) else {
             Toast.shared.show("録画を置けませんでした: \(Env.cacheDir.path)")
             return
         }

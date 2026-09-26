@@ -90,6 +90,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let ocr = NSMenuItem(title: "文字を読む（OCR）", action: #selector(captureOCR(_:)), keyEquivalent: "")
         ocr.target = self
         menu.addItem(ocr)
+        let history = NSMenuItem(title: "キャプチャ履歴（\(HotKeyBindings.history.label)）", action: #selector(openHistory(_:)), keyEquivalent: "")
+        history.target = self
+        menu.addItem(history)
         menu.addItem(.separator())
         let closeAll = NSMenuItem(title: "サムネイルを全部閉じる", action: #selector(closeThumbnails(_:)), keyEquivalent: "")
         closeAll.target = self
@@ -151,6 +154,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
     @objc private func captureOCR(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureOCR() }
+    }
+    @objc private func openHistory(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.history.open() }
     }
     @objc private func closeThumbnails(_ sender: Any?) { app.capture.thumbnails.closeAll() }
     @objc private func closePins(_ sender: Any?) { app.capture.pins.closeAll() }

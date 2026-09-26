@@ -48,6 +48,7 @@ enum StyleService {
         let dpi = 72 * scale
         CGImageDestinationAddImage(d, out, [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)
         guard CGImageDestinationFinalize(d) else { return nil }
+        CaptureStore.copySourceApp(from: source, to: dest)
         Log.write("style.exported name=\(dest.lastPathComponent) px=\(out.width)x\(out.height) bg=\(settings.background.rawValue) padding=\(settings.padding) corner=\(settings.cornerRadius) shadow=\(settings.shadow)")
         return dest
     }

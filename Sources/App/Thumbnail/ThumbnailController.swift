@@ -2,7 +2,7 @@ import AppKit
 import AVFoundation
 
 /// 撮影後のサムネイルの束。撮った画面の左下に最新を置き、古いものほど上へ積む。
-/// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（キャッシュのファイルは 24 時間残る）
+/// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（キャッシュのファイルは 7 日残り、キャプチャ履歴から戻せる）
 final class ThumbnailController {
     private struct Item {
         let panel: ThumbnailPanel
@@ -48,6 +48,14 @@ final class ThumbnailController {
             return
         }
         add(url: url, image: image, isVideo: false, screen: screen)
+    }
+
+    /// キャプチャ履歴から戻す。同じファイルのサムネイルが出ていたら、それを閉じて最新の位置に出し直す
+    func restore(url: URL, screen: NSScreen) {
+        if let existing = items.first(where: { $0.panel.url == url }) {
+            close(existing.panel, reason: "restored_again")
+        }
+        add(url: url, screen: screen)
     }
 
     private func add(url: URL, image: NSImage, isVideo: Bool, screen: NSScreen) {

@@ -15,6 +15,21 @@ final class FileNamingTests: XCTestCase {
         XCTAssertEqual(FileNaming.stem(for: date, timeZone: utc), "2026-01-02_15-04-05")
     }
 
+    func testDateFromNameRoundTrips() {
+        let date = Date(timeIntervalSince1970: 1_767_366_245)
+        let stem = FileNaming.stem(for: date, timeZone: utc)
+        XCTAssertEqual(FileNaming.date(fromName: stem + ".png", timeZone: utc), date)
+        XCTAssertEqual(FileNaming.date(fromName: stem + "_3.mp4", timeZone: utc), date)
+    }
+
+    func testDateFromNameRejectsOtherNames() {
+        XCTAssertNil(FileNaming.date(fromName: "2026-01-02_15-04-05_styled.png", timeZone: utc))
+        XCTAssertNil(FileNaming.date(fromName: "2026-01-02_15-04-05", timeZone: utc))
+        XCTAssertNil(FileNaming.date(fromName: "x2026-01-02_15-04-05.png", timeZone: utc))
+        XCTAssertNil(FileNaming.date(fromName: ".DS_Store", timeZone: utc))
+        XCTAssertNil(FileNaming.date(fromName: "2026-13-02_15-04-05.png", timeZone: utc))
+    }
+
     func testUniqueNameReturnsPlainNameWhenFree() {
         XCTAssertEqual(FileNaming.uniqueName(stem: "a", ext: "png") { _ in false }, "a.png")
     }
@@ -255,7 +270,11 @@ final class RecordingFormatTests: XCTestCase {
 }
 
 final class CacheRetentionTests: XCTestCase {
-    func testOnlyOlderThanADayExpire() {
+    func testMaxAgeIsSevenDays() {
+        XCTAssertEqual(CacheRetention.maxAge, 7 * 86400)
+    }
+
+    func testOnlyOlderThanMaxAgeExpire() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let files: [(name: String, modified: Date)] = [
             ("fresh.png", now.addingTimeInterval(-60)),
@@ -304,5 +323,67 @@ final class RegionMemoryTests: XCTestCase {
     func testLocalRejectsRectAcrossDisplays() {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
         XCTAssertNil(RegionMemory.local(CGRect(x: 1400, y: 100, width: 300, height: 100), in: screen))
+    }
+}
+
+final class CaptureHistoryTests: XCTestCase {
+    private let t0 = Date(timeIntervalSince1970: 1_000_000)
+
+    func testKindByExtension() {
+        XCTAssertEqual(CaptureHistory.Kind.of(ext: "png"), .screenshots)
+        XCTAssertEqual(CaptureHistory.Kind.of(ext: "PNG"), .screenshots)
+        XCTAssertEqual(CaptureHistory.Kind.of(ext: "mp4"), .videos)
+        XCTAssertNil(CaptureHistory.Kind.of(ext: "tmp"))
+        XCTAssertNil(CaptureHistory.Kind.of(ext: ""))
+    }
+
+    func testItemsFilterByKindNewestFirst() {
+        let files = [
+            CaptureHistory.Entry(name: "a.png", created: t0),
+            CaptureHistory.Entry(name: "b.mp4", created: t0.addingTimeInterval(10)),
+            CaptureHistory.Entry(name: "c_styled.png", created: t0.addingTimeInterval(20)),
+            CaptureHistory.Entry(name: ".DS_Store", created: t0.addingTimeInterval(30)),
+            CaptureHistory.Entry(name: "d.png", created: t0.addingTimeInterval(5)),
+        ]
+        XCTAssertEqual(CaptureHistory.items(files, kind: .screenshots).map(\.name), ["c_styled.png", "d.png", "a.png"])
+        XCTAssertEqual(CaptureHistory.items(files, kind: .videos).map(\.name), ["b.mp4"])
+    }
+
+    func testItemsSameTimeUsesNameDescending() {
+        let files = [
+            CaptureHistory.Entry(name: "x.png", created: t0),
+            CaptureHistory.Entry(name: "x_2.png", created: t0),
+        ]
+        XCTAssertEqual(CaptureHistory.items(files, kind: .screenshots).map(\.name), ["x_2.png", "x.png"])
+    }
+
+    func testRelativeAge() {
+        XCTAssertEqual(CaptureHistory.relativeAge(-5), "just now")
+        XCTAssertEqual(CaptureHistory.relativeAge(59), "just now")
+        XCTAssertEqual(CaptureHistory.relativeAge(60), "1 minute ago")
+        XCTAssertEqual(CaptureHistory.relativeAge(23 * 60 + 59), "23 minutes ago")
+        XCTAssertEqual(CaptureHistory.relativeAge(3600), "1 hour ago")
+        XCTAssertEqual(CaptureHistory.relativeAge(11 * 3600 + 3599), "11 hours ago")
+        XCTAssertEqual(CaptureHistory.relativeAge(86400), "1 day ago")
+        XCTAssertEqual(CaptureHistory.relativeAge(6 * 86400 + 1), "6 days ago")
+    }
+
+    func testDurationLabel() {
+        XCTAssertEqual(CaptureHistory.durationLabel(0.2), "0s")
+        XCTAssertEqual(CaptureHistory.durationLabel(1.6), "2s")
+        XCTAssertEqual(CaptureHistory.durationLabel(59.4), "59s")
+        XCTAssertEqual(CaptureHistory.durationLabel(65), "1:05")
+        XCTAssertEqual(CaptureHistory.durationLabel(3723), "1:02:03")
+    }
+
+    func testMoveFocusStopsAtEnds() {
+        XCTAssertNil(CaptureHistory.moveFocus(nil, by: 1, count: 0))
+        XCTAssertNil(CaptureHistory.moveFocus(2, by: 1, count: 0))
+        XCTAssertEqual(CaptureHistory.moveFocus(nil, by: 1, count: 3), 0)
+        XCTAssertEqual(CaptureHistory.moveFocus(0, by: -1, count: 3), 0)
+        XCTAssertEqual(CaptureHistory.moveFocus(0, by: 1, count: 3), 1)
+        XCTAssertEqual(CaptureHistory.moveFocus(2, by: 1, count: 3), 2)
+        // タブ切替などで件数が減ったら末尾に寄せる
+        XCTAssertEqual(CaptureHistory.moveFocus(5, by: 0, count: 3), 2)
     }
 }

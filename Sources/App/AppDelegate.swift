@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var capture: CaptureService!
     /// 登録に失敗したホットキーの表示名（メニューバーに出す）
     private(set) var failedHotKeys: [String] = []
+    private var purgeTimer: Timer?
 
     #if !DEBUG
     private var updaterController: SPUStandardUpdaterController?
@@ -26,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path)")
         ScreenCapturer.logPermission(when: "launch")
         CaptureStore.purge()
+        // 起動しっぱなしでも 7 日より古いものが残り続けないよう、1 日 1 回も掃除する
+        purgeTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { _ in CaptureStore.purge() }
         capture = CaptureService()
 
         registerHotKeys()
@@ -74,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
             (HotKeyBindings.record, { [weak self] in self?.capture.toggleRecording() }),
             (HotKeyBindings.lastRegion, { [weak self] in self?.capture.captureLastRegion() }),
+            (HotKeyBindings.history, { [weak self] in self?.capture.history.toggle() }),
         ]
         for (binding, handler) in pairs {
             let status = HotKeyCenter.shared.register(keyCode: binding.keyCode, modifiers: binding.modifiers, handler: handler)
@@ -166,6 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
     /// `--style <png> <out.png>`: 保存済みの整形の設定で書き出す（クリップボードには書かない）
     /// `--style-open <png>` / `--style-snapshot <png>` / `--style-close`: 整形パネル（`--style-open` はアクティブにしない）
+    /// `--history-open [screenshots|videos]`: キャプチャ履歴を開く（アクティブにしない）/ `--history-dump`: タブ・件数・フォーカス・各項目をログへ
+    /// `--history-focus <n>` / `--history-kind <screenshots|videos>` / `--history-restore`（フォーカス中を戻す）/ `--history-snapshot <png>` / `--history-close`
     /// `--record-display <秒>`: picker とカウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
@@ -226,6 +232,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
             case "--style-close":
                 capture.style.close()
+            case "--history-open":
+                let kind = queue.first.flatMap(CaptureHistory.Kind.init(rawValue:))
+                if kind != nil { queue.removeFirst() }
+                capture.history.open(kind: kind ?? .screenshots, activate: false)
+            case "--history-dump":
+                Log.write("hook.history \(capture.history.dump())")
+            case "--history-focus":
+                if let n = arg().flatMap(Int.init) { capture.history.focus(n) }
+            case "--history-kind":
+                if let kind = arg().flatMap(CaptureHistory.Kind.init(rawValue:)) { capture.history.switchKind(kind) }
+            case "--history-restore":
+                capture.history.restoreFocused()
+            case "--history-snapshot":
+                let path = arg() ?? "/tmp/mycap-history.png"
+                Log.write("hook.history_snapshot path=\(path) ok=\(capture.history.snapshot(to: path))")
+            case "--history-close":
+                capture.history.close(.hook)
             default:
                 Log.write("hook.unknown \(cmd)")
             }

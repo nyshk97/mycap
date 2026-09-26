@@ -6,12 +6,14 @@ final class CaptureService {
     let pins = PinController()
     let style = StylePanelController()
     let recorder = Recorder()
+    let history = HistoryController()
 
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
         thumbnails.onStyle = { [weak self] url in self?.style.open(url) }
         style.onExported = { [weak self] url in self?.thumbnails.add(url: url, screen: .underMouse) }
         recorder.onSaved = { [weak self] url, screen in self?.thumbnails.add(url: url, screen: screen) }
+        history.onRestore = { [weak self] url, screen in self?.thumbnails.restore(url: url, screen: screen) }
     }
     private let capturer = ScreenCapturer()
     private let drag = DragTracker()
@@ -20,6 +22,7 @@ final class CaptureService {
     /// 範囲／ウィンドウ（Space で切り替え）
     func captureRegion() {
         guard ensurePermission() else { return }
+        let app = CaptureStore.frontmostAppID()
         thumbnails.setHidden(true)
         drag.start()
         capturer.capture(.interactive) { [weak self] tmp in
@@ -31,7 +34,7 @@ final class CaptureService {
                 return
             }
             rememberRegion(image: tmp)
-            finish(tmp: tmp, kind: "region", screen: .underMouse)
+            finish(tmp: tmp, kind: "region", screen: .underMouse, app: app)
         }
     }
 
@@ -69,6 +72,7 @@ final class CaptureService {
         }
         guard ensurePermission(), !fullScreenRunning else { return }
         fullScreenRunning = true
+        let app = CaptureStore.frontmostAppID()
         Log.write("capture.started mode=last_region screen=\(screen.displayID) rect=\(NSStringFromRect(region.rect))")
         FullScreenCapturer.capture(screen: screen, rect: region.rect) { [weak self] tmp in
             guard let self else { return }
@@ -78,7 +82,7 @@ final class CaptureService {
                 Toast.shared.show("前回の範囲を撮れませんでした")
                 return
             }
-            finish(tmp: tmp, kind: "last_region", screen: screen)
+            finish(tmp: tmp, kind: "last_region", screen: screen, app: app)
         }
     }
 
@@ -109,6 +113,7 @@ final class CaptureService {
         guard ensurePermission(), !fullScreenRunning else { return }
         fullScreenRunning = true
         let screen = NSScreen.underMouse
+        let app = CaptureStore.frontmostAppID()
         Log.write("capture.started mode=full screen=\(screen.displayID)")
         FullScreenCapturer.capture(screen: screen) { [weak self] tmp in
             guard let self else { return }
@@ -118,7 +123,7 @@ final class CaptureService {
                 Toast.shared.show("全画面を撮れませんでした")
                 return
             }
-            finish(tmp: tmp, kind: "full", screen: screen)
+            finish(tmp: tmp, kind: "full", screen: screen, app: app)
         }
     }
 
@@ -132,17 +137,17 @@ final class CaptureService {
             Log.write("hook.ingest_failed path=\(path) error=\(error)")
             return
         }
-        finish(tmp: tmp, kind: "ingest", screen: .underMouse)
+        finish(tmp: tmp, kind: "ingest", screen: .underMouse, app: CaptureStore.frontmostAppID())
     }
 
     /// キャッシュに置いてサムネイルを出す。保存・コピーはサムネイルのボタンを押したときだけ（ユーザー判断）
-    private func finish(tmp: URL, kind: String, screen: NSScreen) {
-        guard let kept = CaptureStore.keep(tmp) else {
+    private func finish(tmp: URL, kind: String, screen: NSScreen, app: String?) {
+        guard let kept = CaptureStore.keep(tmp, app: app) else {
             Toast.shared.show("撮った画像を置けませんでした: \(Env.cacheDir.path)")
             return
         }
         let px = NSImage(contentsOf: kept)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
-        Log.write("capture.\(kind).captured path=\(kept.path) px=\(px)")
+        Log.write("capture.\(kind).captured path=\(kept.path) px=\(px) app=\(app ?? "-")")
         thumbnails.add(url: kept, screen: screen)
     }
 
