@@ -133,7 +133,7 @@ cask "$CASK_TOKEN" do
   homepage "https://github.com/$GITHUB_REPO"
 
   auto_updates true
-  depends_on macos: ">= :tahoe"
+  depends_on macos: :tahoe
 
   app "mycap.app"
 end
