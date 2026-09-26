@@ -71,6 +71,34 @@ final class AIOLayoutTests: XCTestCase {
         XCTAssertEqual(right.x, 1512 - 8 - 400)
     }
 
+    func testRecordingBarPlacementOrder() {
+        let b = CGSize(width: 150, height: 34)
+        // ふつう → 範囲の外の右下（右端を揃える）
+        let below = AIOLayout.recordingBarOrigin(selection: CGRect(x: 500, y: 400, width: 300, height: 200), bar: b, bounds: bounds)
+        XCTAssertEqual(below.origin, CGPoint(x: 650, y: 358))
+        XCTAssertEqual(below.placement, .below)
+        // 下端に寄せた範囲 → 右上
+        let above = AIOLayout.recordingBarOrigin(selection: CGRect(x: 500, y: 20, width: 300, height: 200), bar: b, bounds: bounds)
+        XCTAssertEqual(above.origin, CGPoint(x: 650, y: 228))
+        XCTAssertEqual(above.placement, .above)
+        // 画面いっぱい → 範囲の内側の右下
+        let inside = AIOLayout.recordingBarOrigin(selection: bounds, bar: b, bounds: bounds)
+        XCTAssertEqual(inside.origin, CGPoint(x: 1512 - 8 - 150, y: 8))
+        XCTAssertEqual(inside.placement, .inside)
+    }
+
+    func testRecordingBarStaysInsideHorizontally() {
+        let b = CGSize(width: 150, height: 34)
+        // 範囲が狭くて左端に寄っている → 画面の左端で止める
+        let narrow = AIOLayout.recordingBarOrigin(selection: CGRect(x: 0, y: 400, width: 50, height: 50), bar: b, bounds: bounds)
+        XCTAssertEqual(narrow.origin.x, 8)
+        // 2 枚目のディスプレイ（原点がずれている）でも、その画面の中に置く
+        let second = CGRect(x: 1512, y: -300, width: 2560, height: 1440)
+        let r = AIOLayout.recordingBarOrigin(selection: CGRect(x: 1512, y: -300, width: 2560, height: 1440), bar: b, bounds: second)
+        XCTAssertEqual(r.origin, CGPoint(x: 1512 + 2560 - 8 - 150, y: -292))
+        XCTAssertEqual(r.placement, .inside)
+    }
+
     func testTopLeftAndGlobalConversion() {
         let local = CGRect(x: 100, y: 700, width: 300, height: 200)
         let tl = AIOLayout.topLeft(local, boundsHeight: 982)

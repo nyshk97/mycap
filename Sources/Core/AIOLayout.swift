@@ -69,6 +69,27 @@ enum AIOLayout {
         return CGPoint(x: x, y: y.rounded())
     }
 
+    enum BarPlacement: String { case below, above, inside }
+
+    /// 録画中の停止バーの左下の位置（グローバル座標・左下原点）。範囲の右端に揃えて、範囲の外の右下 → 右上 → 範囲の内側の右下、の順に置けるところへ。
+    /// 横はディスプレイからはみ出させない。`gap` は範囲からの距離（外周の赤い枠の分を含む）
+    static func recordingBarOrigin(selection s: CGRect, bar b: CGSize, bounds: CGRect,
+                                   gap: CGFloat = 8, margin: CGFloat = 8) -> (origin: CGPoint, placement: BarPlacement) {
+        var x = s.maxX - b.width
+        x = min(max(x, bounds.minX + margin), bounds.maxX - margin - b.width)
+        let below = s.minY - gap - b.height
+        let above = s.maxY + gap
+        if below >= bounds.minY + margin {
+            return (CGPoint(x: x.rounded(), y: below.rounded()), .below)
+        }
+        if above + b.height <= bounds.maxY - margin {
+            return (CGPoint(x: x.rounded(), y: above.rounded()), .above)
+        }
+        let y = min(max(s.minY + gap, bounds.minY + margin), bounds.maxY - margin - b.height)
+        let insideX = min(max(s.maxX - gap - b.width, bounds.minX + margin), bounds.maxX - margin - b.width)
+        return (CGPoint(x: insideX.rounded(), y: y.rounded()), .inside)
+    }
+
     /// 左下原点のローカル座標を、ディスプレイ内の左上原点（ScreenCaptureKit の sourceRect・`LastRegion`）にする
     static func topLeft(_ r: CGRect, boundsHeight: CGFloat) -> CGRect {
         CGRect(x: r.minX, y: boundsHeight - r.maxY, width: r.width, height: r.height)

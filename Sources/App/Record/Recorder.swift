@@ -4,7 +4,7 @@ import ScreenCaptureKit
 
 /// 動画録画。オールインワン（⌘⇧5）で選んだ範囲を、3 秒のカウントダウンのあと
 /// SCRecordingOutput で mp4（1x・H.264・30fps・カーソルあり）に書く。
-/// 録画中は範囲の外側に枠を出す（mycap のウィンドウはフィルタで外すうえ、枠は範囲の外なので写らない）
+/// 録画中は範囲の外側に枠と停止バーを出す（mycap のウィンドウはフィルタで外すうえ、枠は範囲の外なので写らない）
 final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
     enum State: String { case idle, countdown, recording, stopping }
 
@@ -17,6 +17,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
 
     private let countdown = Countdown(logPrefix: "record")
     private let frame = RecordingFrame()
+    private let bar = RecordingBar()
     private var stream: SCStream?
     private var output: SCRecordingOutput?
     private var tmpURL: URL?
@@ -127,7 +128,13 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
                 }
                 self.startedAt = Date()
                 self.state = .recording
-                if let rect { self.frame.show(around: AIOLayout.global(rect, screenFrame: screen.frame)) }
+                if let rect {
+                    let global = AIOLayout.global(rect, screenFrame: screen.frame)
+                    self.frame.show(around: global)
+                    self.bar.show(around: global, on: screen, startedAt: self.startedAt ?? Date()) { [weak self] in
+                        self?.stop(reason: "bar")
+                    }
+                }
                 Log.write("record.started size=\(size.width)x\(size.height) fps=\(RecordingFormat.fps) rect=\(rect.map { NSStringFromRect($0) } ?? "display")")
             }
         }
@@ -138,6 +145,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         stopReason = reason
         state = .stopping
         frame.hide()
+        bar.hide()
         stream.stopCapture { error in
             if let error { Log.write("record.stop_error error=\(error)") }
             // ファイルの確定は recordingOutputDidFinishRecording で受ける。来なければ 3 秒後にここで確定させる
@@ -203,6 +211,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
 
     private func cleanup() {
         frame.hide()
+        bar.hide()
         stream = nil
         output = nil
         tmpURL = nil

@@ -25,7 +25,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|history|aio|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
-`aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= rect=` /
+`aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= rect=` / `record.bar_shown placement=below|above|inside frame=` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
@@ -70,6 +70,10 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --aio-record 200 150 333 211 3  # カウントダウンを飛ばして範囲を 3 秒録る（許可が要る）→ record.started size=332x210（RecordingFormat.outputSize）
 ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 ~/Library/Caches/mycap-dev/<録れた名前>.mp4
 # 録画中の赤い枠は範囲の外側なので写らない（ffmpeg -ss 1.5 -i <mp4> -frames:v 1 で 1 コマ抜いて見る）
+# 録画中の停止バー: 範囲の右下の外 → 右上の外 → 範囲の内側の右下（record.bar_shown placement=）。■ を押したのと同じ経路で止める → record.captured reason=bar
+"${B[@]}" --record-bar-snapshot $S/bar.png                                   # バーだけを描く（経過時間は 0:12 固定）
+"${B[@]}" --aio-record 0 0 2560 1440 30; sleep 5; screencapture -x -D 2 $S/screen.png; "${B[@]}" --record-stop-bar
+# ↑ 画面いっぱい → placement=inside。スクショの右下にバーが出ていて、同じ時刻の mp4 の右下（ffmpeg -ss 3 … -vf crop=…）には写っていない（mycap はフィルタで外している）
 # OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）

@@ -180,6 +180,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--aio-capture <x> <y> <w> <h>`: オールインワンで範囲を選んで Capture した後の経路（マウスのある画面・左上原点のポイント。許可が要る）
     /// `--aio-record <x> <y> <w> <h> <秒>`: カウントダウンを飛ばして、その範囲を指定秒数だけ録る（許可が要る）
     /// `--aio-snapshot <x> <y> <w> <h> <png>`: その範囲を選んだ状態の暗幕とツールバーを、画面に出さずに PNG に描く
+    /// `--record-bar-snapshot <png>`: 録画中の停止バーを、画面に出さずに PNG に描く
+    /// `--record-stop-bar`: 録画中なら停止バーの ■ を押したのと同じ経路で止める（record.captured reason=bar）
     /// どれもフォーカスを奪わない。撮影（screencapture -i）は OS の選択 UI が出るのでフックにしない
     private func runHookCommands(_ args: [String]) {
         var queue = args
@@ -274,6 +276,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let path = arg() ?? "/tmp/mycap-aio.png"
                     Log.write("hook.aio_snapshot path=\(path) ok=\(capture.aio.snapshot(rect: r, to: path))")
                 }
+            case "--record-bar-snapshot":
+                let path = arg() ?? "/tmp/mycap-record-bar.png"
+                Log.write("hook.record_bar_snapshot path=\(path) ok=\(RecordingBar.snapshot(to: path))")
+            case "--record-stop-bar":
+                capture.recorder.stop(reason: "bar")
             case "--record-display":
                 if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
             case "--history-open":
