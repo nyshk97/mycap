@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import CoreImage
 
 /// 撮影後に画面の隅へ出るサムネイル 1 枚。アプリをアクティブにしない NSPanel で、全 Space・フルスクリーンの上にも出る
 final class ThumbnailPanel: NSPanel {
@@ -52,9 +53,9 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private var mouseDownPoint: NSPoint?
     private var escToken: UInt32?
     private(set) var isHovered = false
-    /// 「保存」を押して ~/Downloads に書いた先。保存後は保存ボタンが「Finder で表示」に変わる
+    /// 「保存」を押して ~/Downloads に書いた先。保存後は Save が「Finder」（Finder で表示）に変わる
     private(set) var savedURL: URL?
-    private var saveButton: ActionButton?
+    private var saveButton: PillButton?
 
     init(frame: NSRect, url: URL, image: NSImage, isVideo: Bool, actions: Actions) {
         self.url = url
@@ -75,11 +76,21 @@ final class ThumbnailView: NSView, NSDraggingSource {
         imageView.autoresizingMask = [.width, .height]
         addSubview(imageView)
 
+        // ホバー中は CleanShot X と同じく、画像をぼかして暗くした上にボタンを出す
         overlay.frame = bounds
         overlay.autoresizingMask = [.width, .height]
         overlay.wantsLayer = true
-        overlay.layer?.backgroundColor = NSColor(white: 0, alpha: 0.45).cgColor
         overlay.isHidden = true
+        let blurred = NSImageView(frame: bounds)
+        blurred.image = Self.blurred(image, displayWidth: frame.width)
+        blurred.imageScaling = .scaleProportionallyUpOrDown
+        blurred.autoresizingMask = [.width, .height]
+        overlay.addSubview(blurred)
+        let dim = NSView(frame: bounds)
+        dim.wantsLayer = true
+        dim.layer?.backgroundColor = NSColor(white: 0, alpha: 0.45).cgColor
+        dim.autoresizingMask = [.width, .height]
+        overlay.addSubview(dim)
         addSubview(overlay)
         buildButtons()
         if isVideo { addVideoBadge() }
@@ -87,29 +98,48 @@ final class ThumbnailView: NSView, NSDraggingSource {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// 四隅に丸ボタン（左上 閉じる・右上 ピン・左下 整形・右下 OCR）、中央に Copy / Save。動画は閉じると Save だけ
     private func buildButtons() {
-        let close = Self.button("xmark.circle.fill", tip: "閉じる（Esc）") { [weak self] in self?.actions.close() }
-        close.frame.origin = NSPoint(x: 6, y: bounds.height - 30)
-        close.autoresizingMask = [.maxXMargin, .minYMargin]
-        overlay.addSubview(close)
+        let inset: CGFloat = 7
+        let d = CircleButton.diameter
+        func corner(_ button: NSButton, left: Bool, top: Bool) {
+            button.frame.origin = NSPoint(x: left ? inset : bounds.width - inset - d,
+                                          y: top ? bounds.height - inset - d : inset)
+            button.autoresizingMask = [left ? .maxXMargin : .minXMargin, top ? .minYMargin : .maxYMargin]
+            overlay.addSubview(button)
+        }
+        corner(CircleButton("xmark", tip: "閉じる（Esc）") { [weak self] in self?.actions.close() }, left: true, top: true)
+        if !isVideo {
+            corner(CircleButton("pin.fill", tip: "ピン留め") { [weak self] in self?.actions.pin() }, left: false, top: true)
+            corner(CircleButton("pencil", tip: "整形（背景と余白）") { [weak self] in self?.actions.style() }, left: true, top: false)
+            corner(CircleButton("text.viewfinder", tip: "OCR（文字をコピー）") { [weak self] in self?.actions.ocr() }, left: false, top: false)
+        }
 
-        let save = Self.button("square.and.arrow.down", tip: "保存（~/Downloads）") { [weak self] in self?.pressSave() }
+        let save = PillButton("Save", tip: "保存（~/Downloads）") { [weak self] in self?.pressSave() }
         saveButton = save
-        let row = NSStackView(views: isVideo ? [save] : [
-            Self.button("doc.on.doc", tip: "コピー") { [weak self] in self?.actions.copy() },
-            save,
-            Self.button("pin", tip: "ピン留め") { [weak self] in self?.actions.pin() },
-            Self.button("text.viewfinder", tip: "OCR（文字をコピー）") { [weak self] in self?.actions.ocr() },
-            Self.button("wand.and.stars", tip: "整形（背景と余白）") { [weak self] in self?.actions.style() },
-        ])
-        row.orientation = .horizontal
-        row.spacing = 8
-        row.translatesAutoresizingMaskIntoConstraints = false
-        overlay.addSubview(row)
+        let pills = isVideo ? [save] : [PillButton("Copy", tip: "コピー") { [weak self] in self?.actions.copy() }, save]
+        let column = NSStackView(views: pills)
+        column.orientation = .vertical
+        column.spacing = 6
+        column.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(column)
         NSLayoutConstraint.activate([
-            row.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
-            row.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -8),
+            column.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            column.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
         ])
+    }
+
+    /// ホバー時の背景。表示の大きさで 6pt 相当のぼかしになるよう、画像のピクセル幅に合わせて半径を決める
+    private static func blurred(_ image: NSImage, displayWidth: CGFloat) -> NSImage? {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let input = CIImage(cgImage: cg)
+        let radius = 6 * CGFloat(cg.width) / max(displayWidth, 1)
+        guard let filter = CIFilter(name: "CIGaussianBlur") else { return nil }
+        filter.setValue(input.clampedToExtent(), forKey: kCIInputImageKey)
+        filter.setValue(radius, forKey: kCIInputRadiusKey)
+        guard let output = filter.outputImage?.cropped(to: input.extent),
+              let out = CIContext().createCGImage(output, from: input.extent) else { return nil }
+        return NSImage(cgImage: out, size: image.size)
     }
 
     /// 動画だと分かる印（左下の再生マーク）
@@ -129,24 +159,8 @@ final class ThumbnailView: NSView, NSDraggingSource {
         }
         guard let saved = actions.save() else { return }
         savedURL = saved
-        saveButton?.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Finder で表示")?
-            .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))
+        saveButton?.setLabel("Finder")
         saveButton?.toolTip = "Finder で表示（\(saved.lastPathComponent)）"
-    }
-
-    private static func button(_ symbol: String, tip: String, action: @escaping () -> Void) -> ActionButton {
-        let b = ActionButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
-        b.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)?
-            .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))
-        b.contentTintColor = .white
-        b.isBordered = false
-        b.toolTip = tip
-        b.onPress = action
-        b.target = b
-        b.action = #selector(ActionButton.press)
-        b.widthAnchor.constraint(equalToConstant: 24).isActive = true
-        b.heightAnchor.constraint(equalToConstant: 24).isActive = true
-        return b
     }
 
     // MARK: - ホバー
@@ -214,9 +228,84 @@ final class ThumbnailView: NSView, NSDraggingSource {
     }
 }
 
-/// クロージャで押下を受けるボタン。非アクティブなパネルでも 1 回目のクリックで押せるようにする
-private final class ActionButton: NSButton {
+/// クロージャで押下を受けるボタン。非アクティブなパネルでも 1 回目のクリックで押せるようにする。
+/// 薄いグレーの面に黒い中身。乗ると白く、押すと暗くなる
+private class ActionButton: NSButton {
+    private static let fill = NSColor(white: 0.9, alpha: 0.95)
+    private static let hoverFill = NSColor(white: 1, alpha: 1)
+    private static let pressedFill = NSColor(white: 0.75, alpha: 0.95)
+
     var onPress: (() -> Void)?
-    @objc func press() { onPress?() }
+
+    init(size: NSSize, tip: String, action: @escaping () -> Void) {
+        super.init(frame: NSRect(origin: .zero, size: size))
+        isBordered = false
+        wantsLayer = true
+        layer?.cornerRadius = min(size.width, size.height) / 2
+        layer?.backgroundColor = Self.fill.cgColor
+        contentTintColor = .black
+        toolTip = tip
+        onPress = action
+        target = self
+        self.action = #selector(press)
+        widthAnchor.constraint(equalToConstant: size.width).isActive = true
+        heightAnchor.constraint(equalToConstant: size.height).isActive = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func press() { onPress?() }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) { layer?.backgroundColor = Self.hoverFill.cgColor }
+    override func mouseExited(with event: NSEvent) { layer?.backgroundColor = Self.fill.cgColor }
+
+    /// super.mouseDown はボタンを離すまで戻らない
+    override func mouseDown(with event: NSEvent) {
+        layer?.backgroundColor = Self.pressedFill.cgColor
+        super.mouseDown(with: event)
+        let inside = bounds.contains(convert(window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil))
+        layer?.backgroundColor = (inside ? Self.hoverFill : Self.fill).cgColor
+    }
+}
+
+/// 四隅の丸いアイコンボタン
+private final class CircleButton: ActionButton {
+    static let diameter: CGFloat = 26
+
+    init(_ symbol: String, tip: String, action: @escaping () -> Void) {
+        super.init(size: NSSize(width: Self.diameter, height: Self.diameter), tip: tip, action: action)
+        image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)?
+            .withSymbolConfiguration(.init(pointSize: 12, weight: .bold))
+        imagePosition = .imageOnly
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+/// 中央の Copy / Save。文字幅に合わせた横長の角丸
+private final class PillButton: ActionButton {
+    private static let font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+    private static let height: CGFloat = 28
+    private static let width: CGFloat = 70
+
+    init(_ label: String, tip: String, action: @escaping () -> Void) {
+        super.init(size: NSSize(width: Self.width, height: Self.height), tip: tip, action: action)
+        setLabel(label)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func setLabel(_ label: String) {
+        attributedTitle = NSAttributedString(string: label, attributes: [
+            .font: Self.font, .foregroundColor: NSColor.black,
+        ])
+    }
 }
