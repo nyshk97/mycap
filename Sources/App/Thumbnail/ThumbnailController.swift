@@ -2,8 +2,15 @@ import AppKit
 import AVFoundation
 
 /// 撮影後のサムネイルの束。撮った画面の左下に最新を置き、古いものほど上へ積む。
-/// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（キャッシュのファイルは 7 日残り、キャプチャ履歴から戻せる）
+/// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（キャッシュのファイルは 7 日残り、キャプチャ履歴から戻せる）。
+/// 出した直後の 1 枚は「待ち受け」になり、マウスを乗せなくてもキーを受ける。クリック・アプリの切り替え・時間切れ等で解く
 final class ThumbnailController {
+    /// 待ち受けに入る経路と、直後にフォーカスが戻るアプリ（その activate では解かない）
+    struct Arm {
+        let via: String
+        let returnTo: String?
+    }
+
     private struct Item {
         let panel: ThumbnailPanel
         var screenID: CGDirectDisplayID
@@ -13,10 +20,20 @@ final class ThumbnailController {
     private var items: [Item] = []
     private var hidden = false
 
+    /// 待ち受け中の 1 枚と、それを解くための見張り
+    private weak var armed: ThumbnailPanel?
+    private var armReturnTo: String?
+    private var armStarted = Date()
+    private var armTimer: Timer?
+    private var armMonitors: [Any] = []
+    private var armObserver: NSObjectProtocol?
+
     /// サムネイルの「ピン留め」から呼ぶ
     var onPin: ((URL) -> Void)?
     /// サムネイルの「編集」から呼ぶ
     var onEdit: ((URL) -> Void)?
+    /// 編集ウィンドウが開いている間は、待ち受けでキーを取らない（編集の ⌘S が「Downloads へ保存」に化けないように）
+    var isEditorOpen: (() -> Bool)?
 
     init() {
         NotificationCenter.default.addObserver(
@@ -26,7 +43,7 @@ final class ThumbnailController {
 
     var count: Int { items.count }
 
-    func add(url: URL, screen: NSScreen) {
+    func add(url: URL, screen: NSScreen, arm: Arm? = nil) {
         if url.pathExtension.lowercased() == "mp4" {
             // 動画は先頭のフレームをサムネイルにする
             let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
@@ -38,7 +55,7 @@ final class ThumbnailController {
                         return
                     }
                     self?.add(url: url, image: NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)),
-                              isVideo: true, screen: screen)
+                              isVideo: true, screen: screen, arm: arm)
                 }
             }
             return
@@ -47,22 +64,23 @@ final class ThumbnailController {
             Log.write("thumbnail.load_failed path=\(url.path)")
             return
         }
-        add(url: url, image: image, isVideo: false, screen: screen)
+        add(url: url, image: image, isVideo: false, screen: screen, arm: arm)
     }
 
     /// キャプチャ履歴から戻す。同じファイルのサムネイルが出ていたら、それを閉じて最新の位置に出し直す
-    func restore(url: URL, screen: NSScreen) {
+    func restore(url: URL, screen: NSScreen, arm: Arm? = nil) {
         if let existing = items.first(where: { $0.panel.url == url }) {
             close(existing.panel, reason: "restored_again")
         }
-        add(url: url, screen: screen)
+        add(url: url, screen: screen, arm: arm)
     }
 
     /// 編集して保存したとき。元のサムネイルを同じ位置で編集後の画像に差し替える（元が閉じていれば最新として出す）
-    func replace(_ old: URL, with new: URL) {
+    func replace(_ old: URL, with new: URL, returnTo: String? = nil) {
+        let arm = Arm(via: "replace", returnTo: returnTo)
         guard let index = items.firstIndex(where: { $0.panel.url == old }) else {
             Log.write("thumbnail.replace_missing old=\(old.lastPathComponent)")
-            add(url: new, screen: .underMouse)
+            add(url: new, screen: .underMouse, arm: arm)
             return
         }
         guard let image = NSImage(contentsOf: new) else {
@@ -70,14 +88,18 @@ final class ThumbnailController {
             return
         }
         let oldPanel = items[index].panel
-        items[index] = Item(panel: makePanel(url: new, image: image, isVideo: false), screenID: items[index].screenID)
+        let newPanel = makePanel(url: new, image: image, isVideo: false)
+        items[index] = Item(panel: newPanel, screenID: items[index].screenID)
+        // 新しいパネルがキーを取る前に、古いパネルのキーを手放す
+        if armed === oldPanel { disarm(reason: "next") }
         oldPanel.thumbnailView.releaseKeys()
         oldPanel.orderOut(nil)
         relayout(animated: false)
         Log.write("thumbnail.replaced old=\(old.lastPathComponent) new=\(new.lastPathComponent) index=\(index) count=\(items.count)")
+        startArm(newPanel, arm)
     }
 
-    private func add(url: URL, image: NSImage, isVideo: Bool, screen: NSScreen) {
+    private func add(url: URL, image: NSImage, isVideo: Bool, screen: NSScreen, arm: Arm?) {
         let panel = makePanel(url: url, image: image, isVideo: isVideo)
         items.insert(Item(panel: panel, screenID: screen.displayID), at: 0)
         for old in items.suffix(ThumbnailLayout.overflow(count: items.count)) {
@@ -85,6 +107,7 @@ final class ThumbnailController {
         }
         relayout(animated: true, newest: panel)
         Log.write("thumbnail.added name=\(url.lastPathComponent) video=\(isVideo) screen=\(screen.displayID) count=\(items.count)")
+        if let arm { startArm(panel, arm) }
     }
 
     private func makePanel(url: URL, image: NSImage, isVideo: Bool) -> ThumbnailPanel {
@@ -115,16 +138,26 @@ final class ThumbnailController {
                 OCR.recognizeAndCopy(url: url, source: "thumbnail", near: panel.frame)
                 self?.close(panel, reason: "ocr")
             },
-            edit: { [weak self] in self?.onEdit?(url) },
+            edit: { [weak self] in
+                // 編集ウィンドウの ⌘S 等を横取りしないように
+                self?.disarm(reason: "edit")
+                self?.onEdit?(url)
+            },
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }
         )
         panel = ThumbnailPanel(url: url, image: image, size: size, isVideo: isVideo, actions: actions)
+        panel.thumbnailView.onHoverChange = { [weak self, weak panel] entered in
+            guard let self, let panel, entered, let current = armed else { return }
+            // 乗せたのが待ち受け中の 1 枚ならホバーに引き継ぐ。別の 1 枚なら、そちらがキーを取れるよう先に解く
+            disarm(reason: current === panel ? "hover" : "hover_other")
+        }
         return panel
     }
 
     func close(_ panel: ThumbnailPanel, reason: String) {
         guard let index = items.firstIndex(where: { $0.panel === panel }) else { return }
+        if armed === panel { disarm(reason: "closed") }
         panel.thumbnailView.releaseKeys()
         panel.orderOut(nil)
         items.remove(at: index)
@@ -134,6 +167,7 @@ final class ThumbnailController {
 
     func closeAll() {
         let before = items.count
+        disarm(reason: "closed")
         for item in items {
             item.panel.thumbnailView.releaseKeys()
             item.panel.orderOut(nil)
@@ -145,6 +179,7 @@ final class ThumbnailController {
     /// 撮影中（`screencapture -i` の範囲・ウィンドウ選択中）は隠す。ウィンドウとして選べてしまうのを防ぐ
     func setHidden(_ hide: Bool) {
         hidden = hide
+        if hide { disarm(reason: "hidden") }
         for item in items {
             if hide { item.panel.orderOut(nil) } else { item.panel.orderFrontRegardless() }
         }
@@ -179,11 +214,74 @@ final class ThumbnailController {
         }
     }
 
+    // MARK: - 待ち受け
+
+    /// 出した 1 枚を待ち受けにする。キーを取り合わないよう、ほかのサムネイルのキーと表示を先に手放させる
+    private func startArm(_ panel: ThumbnailPanel, _ arm: Arm) {
+        disarm(reason: "next")
+        for item in items where item.panel !== panel && item.panel.thumbnailView.isHovered {
+            item.panel.thumbnailView.setHovered(false)
+        }
+        armed = panel
+        armReturnTo = arm.returnTo
+        armStarted = Date()
+        let editorOpen = isEditorOpen?() ?? false
+        panel.thumbnailView.setArmed(true, grabKeys: Env.armKeys && !editorOpen)
+        Log.write("thumbnail.armed name=\(panel.url.lastPathComponent) via=\(arm.via) keys=\(panel.thumbnailView.keyCount) editor_open=\(editorOpen) return_to=\(arm.returnTo ?? "-") seconds=\(Env.armSeconds)")
+
+        armTimer = Timer.scheduledTimer(withTimeInterval: Env.armSeconds, repeats: false) { [weak self] _ in
+            self?.disarm(reason: "timeout")
+        }
+        // マウスの監視はアクセシビリティ許可なしで使える（キーの監視は要る）。移動では解かない
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let m = NSEvent.addGlobalMonitorForEvents(matching: clicks, handler: { [weak self] _ in self?.disarm(reason: "click") }) {
+            armMonitors.append(m)
+        }
+        // 自アプリの別ウィンドウ（ピン等）のクリックでも解く。待ち受け中の 1 枚へのクリック（ボタン・持ち出し）では解かない
+        if let m = NSEvent.addLocalMonitorForEvents(matching: clicks, handler: { [weak self] event in
+            if let self, event.window !== armed { disarm(reason: "click") }
+            return event
+        }) {
+            armMonitors.append(m)
+        }
+        armObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self else { return }
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            let id = app?.bundleIdentifier
+            // 撮影・Restore・編集の直後に元のアプリへ戻る activate では解かない
+            if let id, id == armReturnTo { return }
+            let ms = Int(Date().timeIntervalSince(armStarted) * 1000)
+            disarm(reason: "app_switch", detail: "app=\(id ?? "-") after_ms=\(ms)")
+        }
+    }
+
+    /// 待ち受けを解く（待ち受け中でなければ何もしない）。ホバー中ならキーはホバーの分として残る
+    func disarm(reason: String, detail: String? = nil) {
+        // 見張りの後片付けは、パネルが先に解放されていても必ず行う
+        armTimer?.invalidate()
+        armTimer = nil
+        armMonitors.forEach(NSEvent.removeMonitor)
+        armMonitors.removeAll()
+        if let armObserver { NSWorkspace.shared.notificationCenter.removeObserver(armObserver) }
+        armObserver = nil
+        armReturnTo = nil
+        guard let panel = armed else { return }
+        armed = nil
+        panel.thumbnailView.setArmed(false, grabKeys: false)
+        let ms = Int(Date().timeIntervalSince(armStarted) * 1000)
+        Log.write("thumbnail.disarmed name=\(panel.url.lastPathComponent) reason=\(reason) ms=\(ms)\(detail.map { " " + $0 } ?? "")")
+    }
+
     // MARK: - 検証フック用
 
-    /// 最新が先頭。`name screen frame hovered` を返す
+    /// 最新が先頭。`name screen frame hovered armed keys` を返す
     func dump() -> [String] {
-        items.map { "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\($0.panel.thumbnailView.isHovered)" }
+        items.map {
+            let v = $0.panel.thumbnailView
+            return "\($0.panel.url.lastPathComponent) screen=\($0.screenID) frame=\(NSStringFromRect($0.panel.frame)) hovered=\(v.isHovered) armed=\(v.isArmed) keys=\(v.keyCount)"
+        }
     }
 
     /// 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えて使う）

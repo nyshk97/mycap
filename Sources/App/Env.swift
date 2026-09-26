@@ -35,6 +35,24 @@ enum Env {
         return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
     }()
 
+    /// 撮った直後のサムネイルがキーを受ける「待ち受け」の長さ（秒）。dev 版だけ `MYCAP_ARM_SECONDS` で短くできる
+    static let armSeconds: TimeInterval = {
+        #if DEBUG
+        if let v = ProcessInfo.processInfo.environment["MYCAP_ARM_SECONDS"].flatMap(Double.init), v > 0 { return v }
+        #endif
+        return 5
+    }()
+
+    /// 待ち受けでキー（Esc・⌘C 等）を取るか。dev 版だけ `MYCAP_ARM_KEYS=0` で取らない
+    /// （検証フックでサムネイルを出すたびに、ユーザーの ⌘C / Esc / ⌘S を奪わないため）
+    static let armKeys: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["MYCAP_ARM_KEYS"] != "0"
+        #else
+        return true
+        #endif
+    }()
+
     static let logURL: URL = {
         let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Logs/mycap", isDirectory: true)

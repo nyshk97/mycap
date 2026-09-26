@@ -22,7 +22,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|history|record|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
@@ -30,6 +30,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
 
 常駐中の dev に引数を渡す（2 個目のプロセスは引数を既存インスタンスへ転送して終了する）。
+**起動ログの `launch … arm_keys=` が 0 でないインスタンスにはフックを撃たない**（`--ingest` / `--full` / `--history-restore` / `--edit-save` 等でサムネイルが出ると、5 秒間ユーザーのキーを奪う）。
 撮ったものはキャッシュ（`~/Library/Caches/mycap-dev/`）に置かれ、サムネイルの「保存」で初めて保存先に書く。**保存先は `MYCAP_SAVE_DIR` で差し替えて起動し直してから撃つ**（`~/Downloads` を汚さない）。フックはクリップボードに書かない。
 キャッシュの掃除（7 日）は、`touch -t $(date -v-8d +%Y%m%d%H%M)` で古くしたファイルをキャッシュに置いて起動し直すと `cache.purged removed=1` になる（`-v-2d` のものは残る）。
 
@@ -40,16 +41,22 @@ I=Sources/Assets.xcassets/AppIcon.appiconset/icon_1024.png
 sips -z 540 960 $I --out $S/fx/wide.png; sips -z 900 300 $I --out $S/fx/tall.png
 sips -z 20 40 $I --out $S/fx/tiny.png;  sips -z 50 3000 $I --out $S/fx/strip.png
 pkill -x "mycap Dev"; while pgrep -x "mycap Dev" >/dev/null; do sleep 0.2; done
-open -g --env MYCAP_SAVE_DIR=$S/save "/Applications/mycap Dev.app"
+# MYCAP_ARM_KEYS=0: 撮った直後の待ち受けでキーを取らない（フックでサムネイルを出すたびにユーザーの ⌘C / Esc / ⌘S を奪わないため）。MYCAP_ARM_SECONDS で待ち受けを短く
+open -g --env MYCAP_SAVE_DIR=$S/save --env MYCAP_ARM_KEYS=0 --env MYCAP_ARM_SECONDS=3 "/Applications/mycap Dev.app"
 B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --ingest $S/fx/wide.png --ingest $S/fx/tall.png --ingest $S/fx/tiny.png --ingest $S/fx/strip.png
-"${B[@]}" --dump-thumbs          # hook.thumbs に最新が先頭で name / screen / frame / hovered
+"${B[@]}" --dump-thumbs          # hook.thumbs に最新が先頭で name / screen / frame / hovered / armed / keys
 "${B[@]}" --save-newest          # 最新のサムネイルの「保存」を押す → $S/save にできる、サムネイルは閉じる（thumbnail.closed reason=saved）
 "${B[@]}" --hover --snapshot $S/thumb-hover.png --unhover   # ホバー時のボタンの見た目
 "${B[@]}" --full                 # 全画面（選択 UI が出ないのでフック可。許可が無ければトーストで止まる）
 "${B[@]}" --remember-region 100 80 400 300   # 前回の範囲（マウスのある画面・左上原点のポイント）→ region.remembered
 "${B[@]}" --last-region          # 前回と同じ範囲を撮る（許可が要る。144dpi なら 800×600 の capture.last_region.captured）
 "${B[@]}" --close-all
+# 撮った直後の待ち受け: 出した 1 枚が armed=true（keys=0）→ 次を出すと前が reason=next、MYCAP_ARM_SECONDS 後に reason=timeout
+"${B[@]}" --ingest $S/fx/wide.png --dump-thumbs --snapshot $S/armed.png   # 枠がアクセントカラーで光る
+"${B[@]}" --ingest $S/fx/tall.png --dump-thumbs; sleep 4; "${B[@]}" --dump-thumbs
+"${B[@]}" --ingest $S/fx/wide.png --history-open   # reason=history（--history-restore は via=restore、--edit-save は via=replace で armed）
+# クリック・アプリ切り替え・実際のキー（keys>0）は合成できないので人間が確かめる
 # キャプチャ履歴（アクティブにしないで開く。動画の fixture は ffmpeg -f lavfi -i testsrc=size=640x360:rate=30 -t 3 -pix_fmt yuv420p clip.mp4）
 "${B[@]}" --history-open; "${B[@]}" --history-dump   # hook.history に kind / count / focus / 各項目の 名前|相対時刻|app=|icon=|thumb=|focused
 "${B[@]}" --history-focus 2 --history-kind videos --history-snapshot $S/history.png

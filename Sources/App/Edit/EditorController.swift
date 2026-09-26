@@ -4,6 +4,7 @@ import SwiftUI
 /// 編集ウィンドウ（矢印・四角・モザイク・文字を描き込む）。⌘S で `_edited.png` をキャッシュに書き、元のサムネイルを置き換える
 final class EditorController: NSObject, NSWindowDelegate {
     private var window: EditorWindow?
+    var isOpen: Bool { window != nil }
     private var model: EditorModel?
     private var canvas: EditorCanvas?
     /// NSToolbar の delegate は弱参照なので持っておく
@@ -11,7 +12,8 @@ final class EditorController: NSObject, NSWindowDelegate {
     /// 開く前に前面だったアプリ（閉じたら戻す）
     private var previousApp: NSRunningApplication?
     /// 保存した（元の画像, 書き出した画像）を受け取る
-    var onSaved: ((URL, URL) -> Void)?
+    /// 3 つ目は閉じたあとにフォーカスが戻るアプリの bundle id（サムネイルの待ち受けがその activate で解けないように）
+    var onSaved: ((URL, URL, String?) -> Void)?
 
     func open(_ url: URL, activate: Bool = true) {
         if let window, let model, model.isDirty {
@@ -124,8 +126,10 @@ final class EditorController: NSObject, NSWindowDelegate {
             Toast.shared.show("編集した画像を保存できませんでした")
             return
         }
+        let me = ProcessInfo.processInfo.processIdentifier
+        let back = previousApp.flatMap { $0.processIdentifier == me ? nil : $0.bundleIdentifier }
         close()
-        onSaved?(source, out)
+        onSaved?(source, out, back)
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

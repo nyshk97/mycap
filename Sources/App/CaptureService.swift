@@ -11,9 +11,16 @@ final class CaptureService {
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
         thumbnails.onEdit = { [weak self] url in self?.editor.open(url) }
-        editor.onSaved = { [weak self] source, out in self?.thumbnails.replace(source, with: out) }
-        recorder.onSaved = { [weak self] url, screen in self?.thumbnails.add(url: url, screen: screen) }
-        history.onRestore = { [weak self] url, screen in self?.thumbnails.restore(url: url, screen: screen) }
+        thumbnails.isEditorOpen = { [weak self] in self?.editor.isOpen ?? false }
+        editor.onSaved = { [weak self] source, out, back in self?.thumbnails.replace(source, with: out, returnTo: back) }
+        // 録画の停止ではフォーカスが動かないので、戻る先は無し（どのアプリの activate でも待ち受けを解く）
+        recorder.onSaved = { [weak self] url, screen in
+            self?.thumbnails.add(url: url, screen: screen, arm: .init(via: "record", returnTo: nil))
+        }
+        history.onRestore = { [weak self] url, screen, back in
+            self?.thumbnails.restore(url: url, screen: screen, arm: .init(via: "restore", returnTo: back))
+        }
+        history.onOpen = { [weak self] in self?.thumbnails.disarm(reason: "history") }
     }
     private let capturer = ScreenCapturer()
     private let drag = DragTracker()
@@ -89,6 +96,8 @@ final class CaptureService {
     /// 録画の開始（対象を選ぶ）／カウントダウンのキャンセル／停止
     func toggleRecording() {
         if recorder.state == .idle, !ensurePermission() { return }
+        // カウントダウンの Esc と取り合わないように
+        if recorder.state == .idle { thumbnails.disarm(reason: "record") }
         recorder.toggle()
     }
 
@@ -148,7 +157,7 @@ final class CaptureService {
         }
         let px = NSImage(contentsOf: kept)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
         Log.write("capture.\(kind).captured path=\(kept.path) px=\(px) app=\(app ?? "-")")
-        thumbnails.add(url: kept, screen: screen)
+        thumbnails.add(url: kept, screen: screen, arm: .init(via: "capture", returnTo: app))
     }
 
     /// 許可が無いときの `screencapture -i` は Esc と区別の付かない終わり方をするので、撮る前に止めて知らせる

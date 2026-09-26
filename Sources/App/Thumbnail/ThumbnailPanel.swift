@@ -50,9 +50,14 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private let isVideo: Bool
     private let overlay = NSView()
     private var mouseDownPoint: NSPoint?
-    /// ホバー中だけ取っているキー（Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P）の登録 id
+    /// ホバー中・待ち受け中だけ取っているキー（Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P）の登録 id
     private var keyTokens: [UInt32] = []
     private(set) var isHovered = false
+    /// 撮った直後の待ち受け（マウスを乗せなくてもキーを受ける）。解くきっかけは `ThumbnailController` が見張る
+    private(set) var isArmed = false
+    /// マウスの出入り（`ThumbnailController` がキーの持ち主を 1 枚に保つため）
+    var onHoverChange: ((Bool) -> Void)?
+    var keyCount: Int { keyTokens.count }
 
     init(frame: NSRect, url: URL, image: NSImage, isVideo: Bool, actions: Actions) {
         self.url = url
@@ -64,8 +69,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
         layer?.cornerRadius = 10
         layer?.masksToBounds = true
         layer?.backgroundColor = NSColor(white: 0.12, alpha: 0.92).cgColor
-        layer?.borderColor = NSColor(white: 1, alpha: 0.18).cgColor
-        layer?.borderWidth = 1
+        applyBorder()
 
         let imageView = NSImageView(frame: bounds)
         imageView.image = image
@@ -161,21 +165,56 @@ final class ThumbnailView: NSView, NSDraggingSource {
                                        owner: self, userInfo: nil))
     }
 
-    override func mouseEntered(with event: NSEvent) { setHovered(true) }
-    override func mouseExited(with event: NSEvent) { setHovered(false) }
+    override func mouseEntered(with event: NSEvent) {
+        if isArmed {
+            // 待ち受け中の自分に乗せたときは、キーを残したままホバーに引き継ぐ
+            setHovered(true)
+            onHoverChange?(true)
+        } else {
+            // 先に controller へ知らせて、ほかのサムネイルの待ち受けのキーを手放させてから取る
+            onHoverChange?(true)
+            setHovered(true)
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        setHovered(false)
+        onHoverChange?(false)
+    }
 
     /// ホバー中だけ Esc と ⌘C / ⌘S / ⌘O / ⌘E / ⌘P をホットキーとして取る（キー監視のアクセシビリティ許可を要らなくするため）。
-    /// ホバーしていない間は登録しないので、前面のアプリの ⌘C 等はそのまま効く。
+    /// ホバーしていない間は登録しないので、前面のアプリの ⌘C 等はそのまま効く（待ち受け中を除く）。
     /// `grabKeys: false` は検証フックでボタンの見た目だけ撮るとき
     func setHovered(_ hovered: Bool, grabKeys: Bool = true) {
         isHovered = hovered
         overlay.isHidden = !hovered
         if hovered, grabKeys, keyTokens.isEmpty {
             registerHoverKeys()
-        } else if !hovered {
-            keyTokens.forEach(HotKeyCenter.shared.unregister)
-            keyTokens.removeAll()
+        } else if !hovered, !isArmed {
+            unregisterKeys()
         }
+    }
+
+    /// 待ち受けに入る／解く。画像は隠さず枠だけ光らせる（撮った中身を確かめたいのはこの瞬間なので）。
+    /// `grabKeys: false` は検証用の起動（`MYCAP_ARM_KEYS=0`）
+    func setArmed(_ armed: Bool, grabKeys: Bool) {
+        isArmed = armed
+        applyBorder()
+        if armed, grabKeys, keyTokens.isEmpty {
+            registerHoverKeys()
+        } else if !armed, !isHovered {
+            unregisterKeys()
+        }
+    }
+
+    private func applyBorder() {
+        layer?.borderColor = (isArmed ? NSColor.controlAccentColor : NSColor(white: 1, alpha: 0.18)).cgColor
+        layer?.borderWidth = isArmed ? 3 : 1
+    }
+
+    private func unregisterKeys() {
+        keyTokens.forEach(HotKeyCenter.shared.unregister)
+        keyTokens.removeAll()
     }
 
     private func registerHoverKeys() {
@@ -206,6 +245,8 @@ final class ThumbnailView: NSView, NSDraggingSource {
 
     /// 閉じるときにキーを必ず手放す（ホバー中に閉じると mouseExited が来ない）
     func releaseKeys() {
+        isArmed = false
+        applyBorder()
         setHovered(false)
     }
 

@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         let args = Array(CommandLine.arguments.dropFirst()).filter { !$0.hasPrefix("-NS") && !$0.hasPrefix("-Apple") }
         if forwardToRunningInstance(args) { return }
-        Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path)")
+        Log.write("launch pid=\(ProcessInfo.processInfo.processIdentifier) version=\(Env.version) dev=\(Env.isDev) save=\(Env.saveDir.path) arm_keys=\(Env.armKeys ? 1 : 0) arm_seconds=\(Env.armSeconds)")
         ScreenCapturer.logPermission(when: "launch")
         CaptureStore.purge()
         // 起動しっぱなしでも 7 日より古いものが残り続けないよう、1 日 1 回も掃除する

@@ -27,7 +27,10 @@ final class HistoryController {
     }
 
     /// Restore したファイルをサムネイルに出す
-    var onRestore: ((URL, NSScreen) -> Void)?
+    /// 3 つ目は閉じたあとにフォーカスが戻るアプリの bundle id（サムネイルの待ち受けがその activate で解けないように）
+    var onRestore: ((URL, NSScreen, String?) -> Void)?
+    /// 開くとき（サムネイルの待ち受けを解くため。Esc を取り合わないように）
+    var onOpen: (() -> Void)?
 
     private var panel: HistoryPanel?
     private let model = HistoryModel()
@@ -51,6 +54,7 @@ final class HistoryController {
 
     /// `activate: false` は検証フック用（フォーカスを奪わずに表示だけする）
     func open(kind: CaptureHistory.Kind = .screenshots, activate: Bool = true) {
+        onOpen?()
         if isOpen { close(.hook) }
         let front = NSWorkspace.shared.frontmostApplication
         // フックで開いたとき（activate: false）はフォーカスを動かしていないので、閉じても戻さない
@@ -142,8 +146,9 @@ final class HistoryController {
     private func restore(_ item: HistoryItem) {
         let screen = NSScreen.withID(screenID) ?? .underMouse
         Log.write("history.restored name=\(item.url.lastPathComponent)")
+        let back = previousApp?.bundleIdentifier
         close(.restored)
-        onRestore?(item.url, screen)
+        onRestore?(item.url, screen, back)
     }
 
     // MARK: - 検証フック用
