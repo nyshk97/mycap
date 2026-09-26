@@ -14,12 +14,6 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 ## [Unreleased]
 
 ### ✨ Added
-- キャプチャ履歴（⌘⇧3）に静止画と録画をまとめて新しい順に並べる All タブを追加
-
-### 📝 Changed
-- キャプチャ履歴を開いたときの既定のタブを Screenshots から All に変更
-
-### ✨ Added
 - メニューに「アップデートを確認…」を追加
 
 ### 🐛 Fixed
@@ -49,6 +43,12 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 - 該当するものが無いリリース（配布基盤だけの修正など）は「- 内部的な変更のみ」と 1 行書く
 
 ## [Unreleased]
+
+### ✨ Added
+- キャプチャ履歴（⌘⇧3）に静止画と録画をまとめて新しい順に並べる All タブを追加
+
+### 📝 Changed
+- キャプチャ履歴を開いたときの既定のタブを Screenshots から All に変更
 
 ## [0.4.0] - 2026-09-26
 
