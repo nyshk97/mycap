@@ -44,6 +44,9 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### ✨ Added
+- 撮影したとき・録画を始めたとき・録画を止めたときに音を鳴らすように
+
 ## [0.5.0] - 2026-09-26
 
 ### ✨ Added
