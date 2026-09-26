@@ -45,7 +45,7 @@ enum OCR {
                 }
                 let flat = text.replacingOccurrences(of: "\n", with: " ")
                 let head = flat.count > 60 ? String(flat.prefix(60)) + "…" : flat
-                Toast.shared.show(copy ? "コピーしました: \(head)" : "（コピーなし）\(head)", near: anchor)
+                Toast.shared.show(copy ? "Copied: \(head)" : "（コピーなし）\(head)", near: anchor)
             }
             completion?(text)
         }

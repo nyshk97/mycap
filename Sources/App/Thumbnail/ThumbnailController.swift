@@ -116,7 +116,7 @@ final class ThumbnailController {
         let actions = ThumbnailView.Actions(
             copy: { [weak self] in
                 ImageClipboard.copy(url)
-                Toast.shared.show("コピーしました", near: panel.frame)
+                Toast.shared.show("Copied", near: panel.frame)
                 self?.close(panel, reason: "copied")
             },
             save: { [weak self] in
@@ -125,7 +125,7 @@ final class ThumbnailController {
                     return
                 }
                 Log.write("thumbnail.saved name=\(saved.lastPathComponent) dir=\(saved.deletingLastPathComponent().path)")
-                Toast.shared.show("保存しました: \(saved.lastPathComponent)", near: panel.frame)
+                Toast.shared.show("Saved: \(saved.lastPathComponent)", near: panel.frame)
                 self?.close(panel, reason: "saved")
             },
             pin: { [weak self] in

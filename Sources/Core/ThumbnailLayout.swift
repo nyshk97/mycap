@@ -28,7 +28,7 @@ enum ThumbnailLayout {
         }
     }
 
-    /// サムネイルから出した通知（コピーしました等）の置き場所。サムネイルの右隣に縦の中央をそろえ、画面からはみ出さないよう寄せる
+    /// サムネイルから出した通知（Copied 等）の置き場所。サムネイルの右隣に縦の中央をそろえ、画面からはみ出さないよう寄せる
     static func toastOrigin(anchor: CGRect, size: CGSize, visible: CGRect) -> CGPoint {
         let x = min(anchor.maxX + spacing, visible.maxX - size.width)
         let y = min(max(anchor.midY - size.height / 2, visible.minY), visible.maxY - size.height)
