@@ -44,6 +44,8 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-26
+
 ### ✨ Added
 - キャプチャ履歴（⌘⇧3）に静止画と録画をまとめて新しい順に並べる All タブを追加
 
