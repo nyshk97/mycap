@@ -28,7 +28,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= mic= system= rect=` / `record.captured audio_tracks=` / `record.mic_requesting` / `record.mic_answered granted=` / `record.mic_denied` / `record.audio_mixed tracks= ms=` / `record.audio_mix_failed` / `aio.audio_toggled kind=mic|system on=` / `hook.record_audio` / `hook.mix_audio tracks= ms= out=` / `record.bar_shown placement=below|above|inside frame=` /
 `scroll.started rect= px= scale=` / `scroll.overlay bar= preview=right|left|inside frame=` / `scroll.frame kind=first|appended|limit|upward|weak|ambiguous|size dy= score= accepted= height=`（変化なしのコマは出さない）/ `scroll.end_pending` / `scroll.finished reason=done|hotkey|menu_bar|limit|cancel|stream_stopped|no_frame|test height= frames=` / `capture.scrolling.captured` /
 `video.opened mode=preview|trim name= size= window=` / `video.trimmed name= start= end=` / `video.trim_unchanged` / `video.trim_cancelled` / `video.trim_failed` / `video.closed` /
-`cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
+`sound.played what=shot|record_start|record_stop` / `sound.missing file=` / `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
 

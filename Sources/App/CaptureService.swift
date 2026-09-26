@@ -183,6 +183,7 @@ final class CaptureService {
         }
         let px = NSImage(contentsOf: kept)?.representations.first.map { "\($0.pixelsWide)x\($0.pixelsHigh)" } ?? "?"
         Log.write("capture.\(kind).captured path=\(kept.path) px=\(px) app=\(app ?? "-")")
+        Sounds.playShot()
         thumbnails.add(url: kept, screen: screen, arm: .init(via: "capture", returnTo: app))
     }
 

@@ -161,6 +161,8 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
                 }
                 self.startedAt = Date()
                 self.state = .recording
+                // システム音からは mycap 自身の音を除いている（excludesCurrentProcessAudio）ので、開始音は動画に入らない
+                Sounds.playRecordStart()
                 if let rect {
                     let global = AIOLayout.global(rect, screenFrame: screen.frame)
                     self.frame.show(around: global)
@@ -177,6 +179,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         guard state == .recording, let stream else { return }
         stopReason = reason
         state = .stopping
+        Sounds.playRecordStop()
         frame.hide()
         bar.hide()
         stream.stopCapture { error in
@@ -198,6 +201,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
             if self.state == .recording {
                 self.stopReason = "stream_stopped"
                 self.state = .stopping
+                Sounds.playRecordStop()
             }
             // didFinishRecording が来ないことがあるので、少し待っても来なければここで確定させる
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
