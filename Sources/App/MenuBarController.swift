@@ -77,13 +77,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let region = NSMenuItem(title: "範囲／ウィンドウを撮る（\(HotKeyBindings.region.label)）", action: #selector(captureRegion(_:)), keyEquivalent: "")
         region.target = self
         menu.addItem(region)
-        let full = NSMenuItem(title: "全画面を撮る（\(HotKeyBindings.fullScreen.label)）", action: #selector(captureFullScreen(_:)), keyEquivalent: "")
+        let last = NSMenuItem(title: "前回と同じ範囲を撮る（\(HotKeyBindings.lastRegion.label)）", action: #selector(captureLastRegion(_:)), keyEquivalent: "")
+        last.target = self
+        last.isEnabled = LastRegion.load() != nil
+        menu.addItem(last)
+        let full = NSMenuItem(title: "全画面を撮る", action: #selector(captureFullScreen(_:)), keyEquivalent: "")
         full.target = self
         menu.addItem(full)
         let record = NSMenuItem(title: "録画を開始（\(HotKeyBindings.record.label)）", action: #selector(toggleRecording(_:)), keyEquivalent: "")
         record.target = self
         menu.addItem(record)
-        let ocr = NSMenuItem(title: "文字を読む（OCR）（\(HotKeyBindings.ocr.label)）", action: #selector(captureOCR(_:)), keyEquivalent: "")
+        let ocr = NSMenuItem(title: "文字を読む（OCR）", action: #selector(captureOCR(_:)), keyEquivalent: "")
         ocr.target = self
         menu.addItem(ocr)
         menu.addItem(.separator())
@@ -135,6 +139,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// メニューが閉じ切る前に screencapture を起動すると、選択 UI がメニューの後ろに回ることがあるので 1 拍おく
     @objc private func captureRegion(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureRegion() }
+    }
+    @objc private func captureLastRegion(_ sender: Any?) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureLastRegion() }
     }
     @objc private func captureFullScreen(_ sender: Any?) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.app.capture.captureFullScreen() }

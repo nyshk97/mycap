@@ -72,9 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerHotKeys() {
         let pairs: [(HotKeyBindings.Binding, () -> Void)] = [
             (HotKeyBindings.region, { [weak self] in self?.capture.captureRegion() }),
-            (HotKeyBindings.fullScreen, { [weak self] in self?.capture.captureFullScreen() }),
-            (HotKeyBindings.ocr, { [weak self] in self?.capture.captureOCR() }),
             (HotKeyBindings.record, { [weak self] in self?.capture.toggleRecording() }),
+            (HotKeyBindings.lastRegion, { [weak self] in self?.capture.captureLastRegion() }),
         ]
         for (binding, handler) in pairs {
             let status = HotKeyCenter.shared.register(keyCode: binding.keyCode, modifiers: binding.modifiers, handler: handler)
@@ -156,6 +155,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--tcc`: 画面収録の許可の状態をログに出す
     /// `--ingest <png>`: 既存の画像を撮影結果として保存・サムネイルの経路に流す（クリップボードには書かない）
     /// `--full`: マウスのある画面の全画面を撮る（選択 UI が出ないのでフックにできる）
+    /// `--remember-region <x> <y> <w> <h>`: マウスのある画面の範囲（左上原点のポイント）を「前回の範囲」にする
+    /// `--last-region`: 前回と同じ範囲を撮る（選択 UI が出ないのでフックにできる。許可が要る）
     /// `--dump-thumbs`: サムネイルの並び（最新が先頭）と位置をログに出す
     /// `--save-newest`: 最新のサムネイルの「保存」を押す（保存先は MYCAP_SAVE_DIR で差し替えてから）
     /// `--hover` / `--unhover`: 最新のサムネイルのホバー表示を切り替える（Esc は取らない）
@@ -179,6 +180,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let path = arg() { capture.ingest(path: path) }
             case "--full":
                 capture.captureFullScreen()
+            case "--remember-region":
+                let v = [arg(), arg(), arg(), arg()].compactMap { $0.flatMap(Double.init) }
+                if v.count == 4 {
+                    LastRegion.save(LastRegion(displayID: NSScreen.underMouse.displayID, rect: CGRect(x: v[0], y: v[1], width: v[2], height: v[3])))
+                }
+            case "--last-region":
+                capture.captureLastRegion()
             case "--dump-thumbs":
                 Log.write("hook.thumbs count=\(capture.thumbnails.count) items=\(capture.thumbnails.dump())")
             case "--save-newest":

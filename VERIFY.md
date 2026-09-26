@@ -47,6 +47,8 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --save-newest          # 最新のサムネイルの「保存」を押す → $S/save にできる（2 回押すと Finder が開くので 1 回だけ）
 "${B[@]}" --hover --snapshot $S/thumb-hover.png --unhover   # ホバー時のボタンの見た目
 "${B[@]}" --full                 # 全画面（選択 UI が出ないのでフック可。許可が無ければトーストで止まる）
+"${B[@]}" --remember-region 100 80 400 300   # 前回の範囲（マウスのある画面・左上原点のポイント）→ region.remembered
+"${B[@]}" --last-region          # 前回と同じ範囲を撮る（許可が要る。144dpi なら 800×600 の capture.last_region.captured）
 "${B[@]}" --close-all
 # OCR（期待値は Tests/Fixtures/ocr-ja-en.txt。fixture は swift scripts/make_ocr_fixture.swift で作り直せる）
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
@@ -63,6 +65,7 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 - `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
 - `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）
 - `--tcc`: 許可の状態をログに出すだけ
+- 前回の範囲は `defaults read io.github.nyshk97.mycap.dev lastRegion` にある。確認後は `defaults delete` で消す（メニューの「前回と同じ範囲を撮る」が有効のまま残る）。⌘⇧4 のドラッグで覚える経路は `screencapture -i` が要るので人間が確かめる（ログの `region.remembered` / `region.remember_skipped reason=…`）
 - `--style-snapshot` はプレビューと背景の丸ボタンしか写らない（スライダー・トグル・ボタンの文字はプロセス内描画に出ない）。コントロールの見た目は実機で見る
 - フックを渡すだけの 2 個目のプロセスは `launch.forward_to_running` の 1 行だけを出して終わる（`thumbnail.*` 等が出たら、単一インスタンスの判定より前に何かを作っている）
 

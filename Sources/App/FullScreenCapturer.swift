@@ -5,9 +5,10 @@ import UniformTypeIdentifiers
 
 /// 全画面（マウスのあるディスプレイ）を ScreenCaptureKit で撮る。
 /// `screencapture -D <n>` の番号と NSScreen の対応はマルチディスプレイで確かめにくいので、ディスプレイ ID で引ける SCK にした。
-/// mycap 自身のウィンドウ（サムネイル・トースト）は写さない
+/// mycap 自身のウィンドウ（サムネイル・トースト）は写さない。
+/// `rect`（ディスプレイ内の左上原点のポイント）を渡すとその範囲だけ撮る（前回と同じ範囲）
 enum FullScreenCapturer {
-    static func capture(screen: NSScreen, completion: @escaping (URL?) -> Void) {
+    static func capture(screen: NSScreen, rect: CGRect? = nil, completion: @escaping (URL?) -> Void) {
         let id = screen.displayID
         func finish(_ url: URL?) { DispatchQueue.main.async { completion(url) } }
         SCShareableContent.getExcludingDesktopWindows(false, onScreenWindowsOnly: true) { content, error in
@@ -19,8 +20,10 @@ enum FullScreenCapturer {
             let filter = SCContentFilter(display: display, excludingApplications: mine, exceptingWindows: [])
             let scale = CGFloat(filter.pointPixelScale)
             let config = SCStreamConfiguration()
-            config.width = Int(filter.contentRect.width * scale)
-            config.height = Int(filter.contentRect.height * scale)
+            let size = rect?.size ?? filter.contentRect.size
+            if let rect { config.sourceRect = rect }
+            config.width = Int((size.width * scale).rounded())
+            config.height = Int((size.height * scale).rounded())
             config.showsCursor = false
             config.captureResolution = .best
             SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, error in

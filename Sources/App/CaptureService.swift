@@ -14,20 +14,71 @@ final class CaptureService {
         recorder.onSaved = { [weak self] url, screen in self?.thumbnails.add(url: url, screen: screen) }
     }
     private let capturer = ScreenCapturer()
+    private let drag = DragTracker()
     private var fullScreenRunning = false
 
     /// 範囲／ウィンドウ（Space で切り替え）
     func captureRegion() {
         guard ensurePermission() else { return }
         thumbnails.setHidden(true)
+        drag.start()
         capturer.capture(.interactive) { [weak self] tmp in
             guard let self else { return }
+            drag.stop()
             thumbnails.setHidden(false)
             guard let tmp else {
                 Log.write("capture.cancelled mode=region")
                 return
             }
+            rememberRegion(image: tmp)
             finish(tmp: tmp, kind: "region", screen: .underMouse)
+        }
+    }
+
+    /// ドラッグで範囲を選んだときだけ「前回の範囲」を更新する（ウィンドウを撮ったときは前の範囲のまま）
+    private func rememberRegion(image: URL) {
+        guard let down = drag.down, let up = drag.up else {
+            Log.write("region.remember_skipped reason=no_drag")
+            return
+        }
+        let mid = CGPoint(x: (down.x + up.x) / 2, y: (down.y + up.y) / 2)
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(mid, $0.frame, false) }),
+              let rep = NSImage(contentsOf: image)?.representations.first else {
+            Log.write("region.remember_skipped reason=no_screen")
+            return
+        }
+        let px = CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
+        guard let rect = RegionMemory.rect(from: down, to: up, imagePixels: px, scale: screen.backingScaleFactor),
+              let local = RegionMemory.local(rect, in: screen.frame) else {
+            Log.write("region.remember_skipped reason=size_mismatch down=\(down) up=\(up) px=\(px)")
+            return
+        }
+        LastRegion.save(LastRegion(displayID: screen.displayID, rect: local))
+    }
+
+    /// 前回ドラッグで選んだ範囲を、選択 UI を出さずに撮る
+    func captureLastRegion() {
+        guard let region = LastRegion.load() else {
+            Toast.shared.show("前回の範囲がありません。先に \(HotKeyBindings.region.label) で範囲をドラッグして撮ってください")
+            return
+        }
+        guard let screen = NSScreen.withID(region.displayID) else {
+            Toast.shared.show("前回の範囲のディスプレイが見つかりません")
+            Log.write("capture.last_region.no_display id=\(region.displayID)")
+            return
+        }
+        guard ensurePermission(), !fullScreenRunning else { return }
+        fullScreenRunning = true
+        Log.write("capture.started mode=last_region screen=\(screen.displayID) rect=\(NSStringFromRect(region.rect))")
+        FullScreenCapturer.capture(screen: screen, rect: region.rect) { [weak self] tmp in
+            guard let self else { return }
+            fullScreenRunning = false
+            ScreenCapturer.logPermission(when: "after_capture")
+            guard let tmp else {
+                Toast.shared.show("前回の範囲を撮れませんでした")
+                return
+            }
+            finish(tmp: tmp, kind: "last_region", screen: screen)
         }
     }
 

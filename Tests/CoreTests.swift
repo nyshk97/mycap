@@ -246,3 +246,43 @@ final class CacheRetentionTests: XCTestCase {
         XCTAssertEqual(CacheRetention.expired(files, now: now), ["old.png", "older.mp4"])
     }
 }
+
+final class RegionMemoryTests: XCTestCase {
+    func testDragInAnyDirectionMatchesImage() {
+        let a = CGPoint(x: 300, y: 500), b = CGPoint(x: 100, y: 400)
+        let r = RegionMemory.rect(from: a, to: b, imagePixels: CGSize(width: 400, height: 200), scale: 2)
+        XCTAssertEqual(r, CGRect(x: 100, y: 400, width: 200, height: 100))
+    }
+
+    func testRoundingWithinTolerance() {
+        let r = RegionMemory.rect(from: CGPoint(x: 0, y: 0), to: CGPoint(x: 100.5, y: 50.5),
+                                  imagePixels: CGSize(width: 202, height: 100), scale: 2)
+        XCTAssertNotNil(r)
+    }
+
+    func testWindowCaptureOrClickIsRejected() {
+        // Space でウィンドウを撮った（クリックだけ・影つきで大きさが合わない）
+        XCTAssertNil(RegionMemory.rect(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 10, y: 10),
+                                       imagePixels: CGSize(width: 1600, height: 1000), scale: 2))
+        XCTAssertNil(RegionMemory.rect(from: CGPoint(x: 0, y: 0), to: CGPoint(x: 100, y: 100),
+                                       imagePixels: CGSize(width: 1600, height: 1000), scale: 2))
+    }
+
+    func testLocalIsTopLeftOriginOnBuiltIn() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let l = RegionMemory.local(CGRect(x: 100, y: 800, width: 200, height: 100), in: screen)
+        XCTAssertEqual(l, CGRect(x: 100, y: 82, width: 200, height: 100))
+    }
+
+    func testLocalOnSecondaryDisplayWithNegativeOrigin() {
+        // 内蔵の左上に置いた Studio Display
+        let screen = CGRect(x: -1048, y: 982, width: 2560, height: 1440)
+        let l = RegionMemory.local(CGRect(x: -1000, y: 2300, width: 300, height: 100), in: screen)
+        XCTAssertEqual(l, CGRect(x: 48, y: 22, width: 300, height: 100))
+    }
+
+    func testLocalRejectsRectAcrossDisplays() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        XCTAssertNil(RegionMemory.local(CGRect(x: 1400, y: 100, width: 300, height: 100), in: screen))
+    }
+}

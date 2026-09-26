@@ -59,7 +59,7 @@ final class HotKeyCenter {
     }
 }
 
-/// mycap が使うホットキー（固定）。常用版は CleanShot X で使っていた ⌘⇧ 系を引き継ぐ。
+/// mycap が使うホットキー（固定）。常用版は CleanShot X で使っていた ⌘⇧ 系を引き継ぐ（OCR・全画面はメニューからだけ）。
 /// dev 版は CleanShot・常用版と並行できるよう ⌃⌥⌘ の別キー。
 /// OS 標準のスクショショートカット（⌘⇧3/4/5 等）はシステム設定でオフにしてある前提（2026-09-25 に確認）
 enum HotKeyBindings {
@@ -77,8 +77,7 @@ enum HotKeyBindings {
     private static let prefix = "⌘⇧"
     #endif
 
-    static let ocr = Binding(keyCode: kVK_ANSI_2, modifiers: mods, label: prefix + "2")
-    static let fullScreen = Binding(keyCode: kVK_ANSI_3, modifiers: mods, label: prefix + "3")
     static let region = Binding(keyCode: kVK_ANSI_4, modifiers: mods, label: prefix + "4")
     static let record = Binding(keyCode: kVK_ANSI_5, modifiers: mods, label: prefix + "5")
+    static let lastRegion = Binding(keyCode: kVK_ANSI_6, modifiers: mods, label: prefix + "6")
 }

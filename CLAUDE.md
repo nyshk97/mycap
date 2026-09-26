@@ -8,7 +8,7 @@ CleanShot X のうち使っている機能（範囲・ウィンドウ・全画�
 
 挙動は固定値としてコードに焼き込む。変えたくなったらコードを直してリリースする。
 
-- ホットキー（`Sources/App/HotKeys.swift`。Carbon の `RegisterEventHotKey` なのでアクセシビリティ許可は要らない）: 常用 ⌘⇧2 OCR / ⌘⇧3 全画面 / ⌘⇧4 範囲・ウィンドウ / ⌘⇧5 録画。dev は ⌃⌥⌘ ＋ 同じ数字
+- ホットキー（`Sources/App/HotKeys.swift`。Carbon の `RegisterEventHotKey` なのでアクセシビリティ許可は要らない）: 常用 ⌘⇧4 範囲・ウィンドウ / ⌘⇧5 録画 / ⌘⇧6 前回と同じ範囲。dev は ⌃⌥⌘ ＋ 同じ数字。OCR・全画面はメニューからだけ
 - OS 標準のスクショショートカットはシステム設定でオフにしてある前提（2026-09-25 に確認）。常用版は CleanShot X と同じキーを取り合うので、CleanShot X が動いていたらメニューバーで警告する
 - 撮ったもの（静止画・録画・整形の出力）はキャッシュ（`~/Library/Caches/mycap/`、dev は `mycap-dev/`）に置くだけ。`~/Downloads` への保存とコピーは、サムネイルのボタンを押したときだけ。自動でクリップボードに入れるのは OCR の文字だけ。キャッシュは 24 時間で起動時に掃除する
 - 保存先は `~/Downloads`、ファイル名は `YYYY-MM-DD_HH-mm-ss.png` / `.mp4`（同じ秒なら `_2`…）→ `Sources/Core/FileNaming.swift`
