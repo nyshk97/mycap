@@ -232,6 +232,13 @@ final class RegionMemoryTests: XCTestCase {
         XCTAssertEqual(r, CGRect(x: 100, y: 400, width: 200, height: 100))
     }
 
+    func testLateDownIsAnchoredAtUpWithImageSize() {
+        // 実測: 押した瞬間の検出が遅れて始点が内側にずれた（ドラッグ 762x728pt、画像 1596x1518px）
+        let down = CGPoint(x: 720.68359375, y: 941.6484375), up = CGPoint(x: 1482.6484375, y: 213.85546875)
+        let r = RegionMemory.rect(from: down, to: up, imagePixels: CGSize(width: 1596, height: 1518), scale: 2)
+        XCTAssertEqual(r, CGRect(x: 1482.6484375 - 798, y: 213.85546875, width: 798, height: 759))
+    }
+
     func testRoundingWithinTolerance() {
         let r = RegionMemory.rect(from: CGPoint(x: 0, y: 0), to: CGPoint(x: 100.5, y: 50.5),
                                   imagePixels: CGSize(width: 202, height: 100), scale: 2)

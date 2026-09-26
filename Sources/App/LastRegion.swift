@@ -19,9 +19,12 @@ struct LastRegion: Codable {
     }
 }
 
-/// `screencapture -i` の間のドラッグの始点・終点を拾う。マウスのグローバルモニタはアクセシビリティ許可が要らない
+/// `screencapture -i` の間のドラッグの始点・終点を拾う。
+/// `screencapture -i` がマウスを握っている間はグローバルモニタにマウスイベントが届かない（常に no_drag だった）ので、
+/// ボタンの状態と位置をウィンドウサーバーからポーリングする。どちらも許可は要らない
 final class DragTracker {
-    private var monitor: Any?
+    private var timer: Timer?
+    private var pressed = false
     private(set) var down: CGPoint?
     private(set) var up: CGPoint?
 
@@ -29,19 +32,32 @@ final class DragTracker {
         stop()
         down = nil
         up = nil
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
-            let p = NSEvent.mouseLocation
-            if event.type == .leftMouseDown {
-                self?.down = p
-                self?.up = nil
-            } else {
-                self?.up = p
-            }
-        }
+        pressed = false
+        let t = Timer(timeInterval: 1.0 / 120, repeats: true) { [weak self] _ in self?.sample() }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
     }
 
     func stop() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
+        guard let timer else { return }
+        timer.invalidate()
+        self.timer = nil
+        // 離した直後に screencapture が終わってポーリングが離した瞬間を拾えなかったときは、今の位置を終点にする
+        if pressed {
+            sample()
+            if pressed { up = NSEvent.mouseLocation }
+        }
+    }
+
+    private func sample() {
+        let isDown = NSEvent.pressedMouseButtons & 1 != 0
+        let p = NSEvent.mouseLocation
+        if isDown, !pressed {
+            down = p
+            up = nil
+        } else if !isDown, pressed {
+            up = p
+        }
+        pressed = isDown
     }
 }

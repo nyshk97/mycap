@@ -6,14 +6,24 @@ enum RegionMemory {
     /// 画像のピクセル数とドラッグの矩形（×scale）のずれの許容（ピクセル）。端数の丸め分
     static let tolerance: CGFloat = 4
 
+    /// ドラッグの測り残しの許容（画像の大きさに対する割合）。
+    /// ボタンを押した瞬間の検出はポーリングなので遅れ、始点が終点側に数十ポイントずれる（実測で約 4.5%）
+    static let shortfallRatio: CGFloat = 0.25
+
     /// ドラッグの始点・終点（AppKit のグローバル座標）から範囲を作る。
-    /// 撮れた画像と大きさが合わなければ nil（Space でウィンドウを撮った・クリックだけ等）
+    /// 大きさは撮れた画像のピクセル数を正とし、位置は終点（離した点。マウスが止まっているので正確）とドラッグの向きで決める。
+    /// ドラッグが画像より大きい・小さすぎるときは nil（Space でウィンドウを撮った・クリックだけ等）
     static func rect(from a: CGPoint, to b: CGPoint, imagePixels: CGSize, scale: CGFloat) -> CGRect? {
-        let r = CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
-        guard r.width >= 1, r.height >= 1 else { return nil }
-        guard abs(r.width * scale - imagePixels.width) <= tolerance,
-              abs(r.height * scale - imagePixels.height) <= tolerance else { return nil }
-        return r
+        let dragged = CGSize(width: abs(a.x - b.x), height: abs(a.y - b.y))
+        let size = CGSize(width: imagePixels.width / scale, height: imagePixels.height / scale)
+        let slack = tolerance / scale
+        guard dragged.width >= 1, dragged.height >= 1 else { return nil }
+        guard dragged.width <= size.width + slack, dragged.height <= size.height + slack,
+              dragged.width >= size.width * (1 - shortfallRatio) - slack,
+              dragged.height >= size.height * (1 - shortfallRatio) - slack else { return nil }
+        let x = b.x >= a.x ? b.x - size.width : b.x
+        let y = b.y >= a.y ? b.y - size.height : b.y
+        return CGRect(x: x, y: y, width: size.width, height: size.height)
     }
 
     /// グローバル座標の範囲を、ディスプレイ内の左上原点の座標（ScreenCaptureKit の sourceRect）にする。
