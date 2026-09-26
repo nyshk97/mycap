@@ -168,8 +168,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--close-all`: サムネイルを全部閉じる
     /// `--ocr <png>`: 文字を読んでログとトーストに出す（クリップボードには書かない）
     /// `--pin <png>` / `--dump-pins` / `--close-pins`: ピン留め（`--pin` はクリックしないので key にならない）
-    /// `--style <png> <out.png>`: 保存済みの整形の設定で書き出す（クリップボードには書かない）
-    /// `--style-open <png>` / `--style-snapshot <png>` / `--style-close`: 整形パネル（`--style-open` はアクティブにしない）
+    /// `--annotate <png> <json> <out.png>`: 注釈（`[Annotation]` の JSON）を焼き込んで書き出す
+    /// `--edit-open <png>`: 編集ウィンドウを開く（アクティブにしない）/ `--edit-load <json>`: 注釈を足す / `--edit-select <n>` / `--edit-color <n>`（プリセットの添字）
+    /// `--edit-undo` / `--edit-dump`（要素・選択・取り消しの深さをログへ）/ `--edit-snapshot <png>` / `--edit-save`（保存してサムネイルを置き換える）/ `--edit-close`（確認なしで破棄）
     /// `--history-open [screenshots|videos]`: キャプチャ履歴を開く（アクティブにしない）/ `--history-dump`: タブ・件数・フォーカス・各項目をログへ
     /// `--history-focus <n>` / `--history-kind <screenshots|videos>` / `--history-restore`（フォーカス中を戻す）/ `--history-snapshot <png>` / `--history-close`
     /// `--record-display <秒>`: picker とカウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
@@ -218,20 +219,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.write("hook.pins count=\(capture.pins.count) items=\(capture.pins.dump())")
             case "--close-pins":
                 capture.pins.closeAll()
-            case "--style":
-                if let src = arg(), let out = arg() {
-                    let url = StyleService.export(URL(fileURLWithPath: src), settings: StyleService.settings, to: URL(fileURLWithPath: out))
-                    Log.write("hook.style ok=\(url != nil)")
+            case "--annotate":
+                if let src = arg(), let json = arg(), let out = arg() {
+                    let list = (try? Data(contentsOf: URL(fileURLWithPath: json))).flatMap { try? JSONDecoder().decode([Annotation].self, from: $0) }
+                    let url = list.flatMap { EditService.export(URL(fileURLWithPath: src), annotations: $0, to: URL(fileURLWithPath: out)) }
+                    Log.write("hook.annotate ok=\(url != nil) count=\(list?.count ?? -1)")
                 }
-            case "--style-open":
-                if let src = arg() { capture.style.open(URL(fileURLWithPath: src), activate: false) }
-            case "--style-snapshot":
-                let path = arg() ?? "/tmp/mycap-style.png"
-                Log.write("hook.style_snapshot path=\(path) ok=\(capture.style.snapshot(to: path))")
+            case "--edit-open":
+                if let src = arg() { capture.editor.open(URL(fileURLWithPath: src), activate: false) }
+            case "--edit-load":
+                if let json = arg() { capture.editor.load(json: json) }
+            case "--edit-select":
+                if let n = arg().flatMap(Int.init) { capture.editor.selectIndex(n) }
+            case "--edit-color":
+                if let n = arg().flatMap(Int.init) { capture.editor.setColor(index: n) }
+            case "--edit-undo":
+                capture.editor.undo()
+            case "--edit-dump":
+                Log.write("hook.edit \(capture.editor.dump())")
+            case "--edit-snapshot":
+                let path = arg() ?? "/tmp/mycap-edit.png"
+                Log.write("hook.edit_snapshot path=\(path) ok=\(capture.editor.snapshot(to: path))")
+            case "--edit-save":
+                capture.editor.save()
+            case "--edit-close":
+                capture.editor.close()
             case "--record-display":
                 if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
-            case "--style-close":
-                capture.style.close()
             case "--history-open":
                 let kind = queue.first.flatMap(CaptureHistory.Kind.init(rawValue:))
                 if kind != nil { queue.removeFirst() }

@@ -5,7 +5,7 @@
 ```bash
 mise run build          # Debug（mycap Dev）。署名 xcconfig が無ければ ad-hoc で通る
 mise run build-release  # Release（mycap）
-mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ・整形の描画の画素）
+mise run test           # Sources/Core の純粋関数（ファイル名の規則・サムネイルの大きさと積み方・OCR の行の組み立て・ピンの大きさ・注釈（矢印・四角・モザイク・文字）の描画の画素と当たり判定・取り消し）
 mise run run            # /Applications/mycap Dev.app に置いて起動し直す（旧プロセスの終了を待つ）
 ```
 
@@ -22,9 +22,9 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `launch` / `hotkey.registered` / `hotkey.register_failed` / `hotkey.not_implemented` / `menu.installed` /
 `tcc.preflight granted=… when=launch|before_capture|after_capture|hook` /
 `capture.started` / `capture.finished` / `capture.cancelled` / `capture.{region,full,ingest}.captured` / `capture.skipped` / `capture.save_failed` /
-`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr` / `thumbnail.saved` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
+`clipboard.copied` / `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p` / `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=esc|double_click|menu` / `pin.closed` / `pin.opacity` /
-`style.opened` / `style.exported px= bg= padding= corner= shadow=` / `style.render_failed` /
+`edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
 
 ## 検証フック（dev 版のみ・フォーカスを奪わない）
@@ -59,9 +59,19 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --ocr "$PWD/Tests/Fixtures/ocr-ja-en.png"      # hook.ocr text=…（改行は ⏎）
 # ピン（マウスのある画面の中央に実寸。リサイズは縁と角のドラッグなので人間が確かめる）
 "${B[@]}" --pin "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-pins --close-pins
-# 整形（保存済みの設定で書き出す。144dpi の 1800×720 に既定の余白 48pt → 1992×912）
-"${B[@]}" --style "$PWD/Tests/Fixtures/ocr-ja-en.png" $S/styled.png
-"${B[@]}" --style-open "$PWD/Tests/Fixtures/ocr-ja-en.png"; "${B[@]}" --style-snapshot $S/style-panel.png --style-close
+# 編集（注釈は [Annotation] の JSON。座標は画像のピクセル・左上原点。end / color / text / font は省略可）
+cat > $S/ann.json <<'J'
+[{"kind":"rect","start":[80,60],"end":[900,260],"size":8},
+ {"kind":"arrow","start":[1500,650],"end":[950,200],"size":10},
+ {"kind":"mosaic","start":[100,400],"end":[700,640],"size":20},
+ {"kind":"text","start":[1000,420],"size":72,"text":"ここを押す\n2行目","color":{"r":0,"g":0.478,"b":1},"font":"HiraMaruProN-W4"}]
+J
+"${B[@]}" --annotate "$PWD/Tests/Fixtures/ocr-ja-en.png" $S/ann.json $S/annotated.png   # 焼き込みだけ（144dpi・1800×720 のまま）
+# 編集ウィンドウ → 保存でサムネイルが置き換わる（枚数は変わらず、名前が _edited に。再編集は _edited_2）
+"${B[@]}" --ingest "$PWD/Tests/Fixtures/ocr-ja-en.png" --dump-thumbs
+"${B[@]}" --edit-open ~/Library/Caches/mycap-dev/<撮った名前>.png --edit-load $S/ann.json --edit-select 3 --edit-dump --edit-snapshot $S/editor.png
+"${B[@]}" --edit-select 0 --edit-color 3 --edit-undo --edit-dump   # 色の変更が取り消しに 1 回分積まれ、undo で戻る（undo= と color=）
+"${B[@]}" --edit-save --dump-thumbs                                 # edit.exported / thumbnail.replaced（同じ frame）
 ```
 
 - 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の左端 = visibleFrame.minX + 16、下端 = visibleFrame.minY + 16 になる
@@ -70,10 +80,11 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 - `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
 - `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）
 - `--tcc`: 許可の状態をログに出すだけ
-- キャプチャ履歴の時刻はファイル名から取る（`--ingest` のコピーは作成日時が元ファイルのものになるため）。整形の出力（`_styled`）だけ作成日時。`--history-snapshot` はプロセス内描画なので、すりガラスの背景は灰色に写る
+- キャプチャ履歴の時刻はファイル名から取る（`--ingest` のコピーは作成日時が元ファイルのものになるため）。編集の出力（`_edited`）だけ作成日時。`--history-snapshot` はプロセス内描画なので、すりガラスの背景は灰色に写る
 - キャプチャ履歴のキー操作（←→ / Enter / Esc / Tab）・ホバー・ダブルクリック・外クリックで閉じる・閉じたあと元のアプリに戻るは、パネルを key にする必要がありフォーカスを奪うので、人間が ⌃⌥⌘3 で確かめる
 - 前回の範囲は `defaults read io.github.nyshk97.mycap.dev lastRegion` にある。確認後は `defaults delete` で消す（メニューの「前回と同じ範囲を撮る」が有効のまま残る）。⌘⇧4 のドラッグで覚える経路は `screencapture -i` が要るので人間が確かめる（ログの `region.remembered` / `region.remember_skipped reason=…`）
-- `--style-snapshot` はプレビューと背景の丸ボタンしか写らない（スライダー・トグル・ボタンの文字はプロセス内描画に出ない）。コントロールの見た目は実機で見る
+- `--edit-snapshot` はキャンバス（画像・注釈・選択枠）と色の丸は写るが、ツールバーのスライダー・ボタンの文字はプロセス内描画に出ない。ツールバーの見た目・マウスで描く・文字の入力（日本語の変換）・⌘Z / ⌘S / Esc は、ウィンドウを key にする必要があるので人間が確かめる
+- **ユーザーが dev 版を触っている間は編集のフックを撃たない**。`--edit-close` は確認なしで破棄し、`--close-all` はサムネイルを全部閉じる（2026-09-26 に、ユーザーが ⌘E で描いていたモザイクを消した実例）。撃つ前に `tail ~/Library/Logs/mycap/mycap-dev.log` で `thumbnail.key` / `edit.opened` が自分のフック以外から出ていないか見る。`--edit-open` は描きかけがあると `edit.open_blocked` で開かない
 - フックを渡すだけの 2 個目のプロセスは `launch.forward_to_running` の 1 行だけを出して終わる（`thumbnail.*` 等が出たら、単一インスタンスの判定より前に何かを作っている）
 
 ## 画面収録の許可（TCC）

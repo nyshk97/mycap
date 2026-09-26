@@ -4,14 +4,14 @@ import AppKit
 final class CaptureService {
     let thumbnails = ThumbnailController()
     let pins = PinController()
-    let style = StylePanelController()
+    let editor = EditorController()
     let recorder = Recorder()
     let history = HistoryController()
 
     init() {
         thumbnails.onPin = { [weak self] url in self?.pins.pin(url: url) }
-        thumbnails.onStyle = { [weak self] url in self?.style.open(url) }
-        style.onExported = { [weak self] url in self?.thumbnails.add(url: url, screen: .underMouse) }
+        thumbnails.onEdit = { [weak self] url in self?.editor.open(url) }
+        editor.onSaved = { [weak self] source, out in self?.thumbnails.replace(source, with: out) }
         recorder.onSaved = { [weak self] url, screen in self?.thumbnails.add(url: url, screen: screen) }
         history.onRestore = { [weak self] url, screen in self?.thumbnails.restore(url: url, screen: screen) }
     }

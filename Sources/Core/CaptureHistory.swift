@@ -12,7 +12,7 @@ enum CaptureHistory {
             }
         }
 
-        /// 拡張子から種別を決める。キャッシュには png（静止画・整形の出力）と mp4（録画）しか置かない
+        /// 拡張子から種別を決める。キャッシュには png（静止画・編集の出力）と mp4（録画）しか置かない
         static func of(ext: String) -> Kind? {
             switch ext.lowercased() {
             case "png": .screenshots

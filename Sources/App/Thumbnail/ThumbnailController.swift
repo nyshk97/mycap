@@ -15,8 +15,8 @@ final class ThumbnailController {
 
     /// サムネイルの「ピン留め」から呼ぶ
     var onPin: ((URL) -> Void)?
-    /// サムネイルの「整形」から呼ぶ
-    var onStyle: ((URL) -> Void)?
+    /// サムネイルの「編集」から呼ぶ
+    var onEdit: ((URL) -> Void)?
 
     init() {
         NotificationCenter.default.addObserver(
@@ -58,7 +58,36 @@ final class ThumbnailController {
         add(url: url, screen: screen)
     }
 
+    /// 編集して保存したとき。元のサムネイルを同じ位置で編集後の画像に差し替える（元が閉じていれば最新として出す）
+    func replace(_ old: URL, with new: URL) {
+        guard let index = items.firstIndex(where: { $0.panel.url == old }) else {
+            Log.write("thumbnail.replace_missing old=\(old.lastPathComponent)")
+            add(url: new, screen: .underMouse)
+            return
+        }
+        guard let image = NSImage(contentsOf: new) else {
+            Log.write("thumbnail.load_failed path=\(new.path)")
+            return
+        }
+        let oldPanel = items[index].panel
+        items[index] = Item(panel: makePanel(url: new, image: image, isVideo: false), screenID: items[index].screenID)
+        oldPanel.thumbnailView.releaseKeys()
+        oldPanel.orderOut(nil)
+        relayout(animated: false)
+        Log.write("thumbnail.replaced old=\(old.lastPathComponent) new=\(new.lastPathComponent) index=\(index) count=\(items.count)")
+    }
+
     private func add(url: URL, image: NSImage, isVideo: Bool, screen: NSScreen) {
+        let panel = makePanel(url: url, image: image, isVideo: isVideo)
+        items.insert(Item(panel: panel, screenID: screen.displayID), at: 0)
+        for old in items.suffix(ThumbnailLayout.overflow(count: items.count)) {
+            close(old.panel, reason: "overflow")
+        }
+        relayout(animated: true, newest: panel)
+        Log.write("thumbnail.added name=\(url.lastPathComponent) video=\(isVideo) screen=\(screen.displayID) count=\(items.count)")
+    }
+
+    private func makePanel(url: URL, image: NSImage, isVideo: Bool) -> ThumbnailPanel {
         let size = ThumbnailLayout.panelSize(for: image.size)
         var panel: ThumbnailPanel!
         let actions = ThumbnailView.Actions(
@@ -82,17 +111,12 @@ final class ThumbnailController {
                 OCR.recognizeAndCopy(url: url, source: "thumbnail", near: panel.frame)
                 self?.close(panel, reason: "ocr")
             },
-            style: { [weak self] in self?.onStyle?(url) },
+            edit: { [weak self] in self?.onEdit?(url) },
             close: { [weak self] in self?.close(panel, reason: "button") },
             draggedOut: { [weak self] in self?.close(panel, reason: "dragged_out") }
         )
         panel = ThumbnailPanel(url: url, image: image, size: size, isVideo: isVideo, actions: actions)
-        items.insert(Item(panel: panel, screenID: screen.displayID), at: 0)
-        for old in items.suffix(ThumbnailLayout.overflow(count: items.count)) {
-            close(old.panel, reason: "overflow")
-        }
-        relayout(animated: true, newest: panel)
-        Log.write("thumbnail.added name=\(url.lastPathComponent) video=\(isVideo) screen=\(screen.displayID) count=\(items.count)")
+        return panel
     }
 
     func close(_ panel: ThumbnailPanel, reason: String) {

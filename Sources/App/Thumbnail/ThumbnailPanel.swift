@@ -31,13 +31,13 @@ final class ThumbnailPanel: NSPanel {
 /// サムネイルの中身。画像・ホバー時のボタン・ドラッグでの持ち出し
 final class ThumbnailView: NSView, NSDraggingSource {
     struct Actions {
-        /// コピー・保存・OCR は済んだらサムネイルを閉じる（保存は失敗したら閉じない）。整形・ピン留めは閉じない
+        /// コピー・保存・OCR は済んだらサムネイルを閉じる（保存は失敗したら閉じない）。編集・ピン留めは閉じない
         var copy: () -> Void
         /// ~/Downloads へ保存する
         var save: () -> Void
         var pin: () -> Void
         var ocr: () -> Void
-        var style: () -> Void
+        var edit: () -> Void
         var close: () -> Void
         /// ドラッグで持ち出せたとき（ドロップ先が受け取ったとき）
         var draggedOut: () -> Void
@@ -46,7 +46,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
     private let url: URL
     private let image: NSImage
     private let actions: Actions
-    /// 動画はコピー・ピン・OCR・整形を出さない（保存・閉じる・ドラッグだけ）
+    /// 動画はコピー・ピン・OCR・編集を出さない（保存・閉じる・ドラッグだけ）
     private let isVideo: Bool
     private let overlay = NSView()
     private var mouseDownPoint: NSPoint?
@@ -95,7 +95,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// 四隅に丸ボタン（左上 閉じる・右上 ピン・左下 整形・右下 OCR）、中央に Copy / Save。動画は閉じると Save だけ
+    /// 四隅に丸ボタン（左上 閉じる・右上 ピン・左下 編集・右下 OCR）、中央に Copy / Save。動画は閉じると Save だけ
     private func buildButtons() {
         let inset: CGFloat = 7
         let d = CircleButton.diameter
@@ -108,7 +108,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
         corner(CircleButton("xmark", tip: "閉じる（Esc）") { [weak self] in self?.actions.close() }, left: true, top: true)
         if !isVideo {
             corner(CircleButton("pin.fill", tip: "ピン留め（⌘P）") { [weak self] in self?.actions.pin() }, left: false, top: true)
-            corner(CircleButton("pencil", tip: "整形（背景と余白）（⌘E）") { [weak self] in self?.actions.style() }, left: true, top: false)
+            corner(CircleButton("pencil", tip: "編集（矢印・四角・モザイク・文字）（⌘E）") { [weak self] in self?.actions.edit() }, left: true, top: false)
             corner(CircleButton("text.viewfinder", tip: "OCR（文字をコピー）（⌘O）") { [weak self] in self?.actions.ocr() }, left: false, top: false)
         }
 
@@ -185,7 +185,7 @@ final class ThumbnailView: NSView, NSDraggingSource {
             keys += [
                 (kVK_ANSI_C, cmdKey, "cmd_c", { [weak self] in self?.actions.copy() }),
                 (kVK_ANSI_O, cmdKey, "cmd_o", { [weak self] in self?.actions.ocr() }),
-                (kVK_ANSI_E, cmdKey, "cmd_e", { [weak self] in self?.actions.style() }),
+                (kVK_ANSI_E, cmdKey, "cmd_e", { [weak self] in self?.actions.edit() }),
                 (kVK_ANSI_P, cmdKey, "cmd_p", { [weak self] in self?.actions.pin() }),
             ]
         }

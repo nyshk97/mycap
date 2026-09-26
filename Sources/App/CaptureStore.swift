@@ -34,7 +34,7 @@ enum CaptureStore {
     }
 
     /// キャッシュのファイル（名前・撮った時刻）。キャプチャ履歴の元。
-    /// 時刻は名前から取る（`--ingest` のコピー等は作成日時が元ファイルのものになるため）。整形の出力など名前から取れないものだけ作成日時
+    /// 時刻は名前から取る（`--ingest` のコピー等は作成日時が元ファイルのものになるため）。編集の出力など名前から取れないものだけ作成日時
     static func entries() -> [CaptureHistory.Entry] {
         let fm = FileManager.default
         let names = (try? fm.contentsOfDirectory(atPath: Env.cacheDir.path)) ?? []
@@ -64,7 +64,7 @@ enum CaptureStore {
         return String(decoding: buf, as: UTF8.self)
     }
 
-    /// 整形の出力に元画像のアプリを引き継ぐ
+    /// 編集の出力に元画像のアプリを引き継ぐ
     static func copySourceApp(from src: URL, to dest: URL) {
         if let app = sourceApp(of: src) { setSourceApp(app, of: dest) }
     }

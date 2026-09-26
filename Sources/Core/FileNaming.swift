@@ -13,7 +13,7 @@ enum FileNaming {
     }
 
     /// `stem` の逆。`2026-09-25_18-54-12.png` / `…_2.mp4` から撮った時刻を取る。
-    /// 規則どおりの名前でなければ nil（整形の出力 `…_styled.png` は元画像の時刻になってしまうので、あえて読まない）
+    /// 規則どおりの名前でなければ nil（編集の出力 `…_edited.png` は元画像の時刻になってしまうので、あえて読まない）
     static func date(fromName name: String, timeZone: TimeZone = .current) -> Date? {
         let pattern = #"^(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})(_\d+)?\.[A-Za-z0-9]+$"#
         guard let match = name.range(of: pattern, options: .regularExpression) else { return nil }
@@ -24,6 +24,14 @@ enum FileNaming {
         f.timeZone = timeZone
         f.dateFormat = "yyyy-MM-dd_HH-mm-ss"
         return f.date(from: stem)
+    }
+
+    /// 編集の出力の名前の元（拡張子なし）。`a.png` → `a_edited`。編集済みを編集し直しても `_edited_edited` にせず、
+    /// `a_edited.png` / `a_edited_2.png` → `a_edited`（`uniqueName` で `_2`… が付く）
+    static func editedStem(for name: String) -> String {
+        let stem = (name as NSString).deletingPathExtension
+        let base = stem.replacingOccurrences(of: #"_edited(_\d+)?$"#, with: "", options: .regularExpression)
+        return base + "_edited"
     }
 
     /// `exists` がファイル名（拡張子込み）の存在を答える。最初に空いている名前を返す
