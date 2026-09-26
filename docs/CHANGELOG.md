@@ -44,6 +44,9 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### 📝 Changed
+- 撮影後のサムネイルを画面の右下から左下に移した
+
 ## [0.1.1] - 2026-09-26
 
 ### ✨ Added

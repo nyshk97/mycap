@@ -63,13 +63,13 @@ final class ThumbnailLayoutTests: XCTestCase {
         XCTAssertLessThanOrEqual(top, builtIn.maxY, "top=\(top) visibleMaxY=\(builtIn.maxY)")
     }
 
-    func testNewestIsBottomRightAndOlderStackUp() {
+    func testNewestIsBottomLeftAndOlderStackUp() {
         let sizes = [CGSize(width: 240, height: 135), CGSize(width: 150, height: 150)]
         let frames = ThumbnailLayout.frames(visible: builtIn, sizes: sizes)
-        XCTAssertEqual(frames[0].maxX, builtIn.maxX - ThumbnailLayout.margin)
+        XCTAssertEqual(frames[0].minX, builtIn.minX + ThumbnailLayout.margin)
         XCTAssertEqual(frames[0].minY, builtIn.minY + ThumbnailLayout.margin)
         XCTAssertEqual(frames[1].minY, frames[0].maxY + ThumbnailLayout.spacing)
-        XCTAssertEqual(frames[1].maxX, builtIn.maxX - ThumbnailLayout.margin)
+        XCTAssertEqual(frames[1].minX, builtIn.minX + ThumbnailLayout.margin)
     }
 
     func testFramesStayOnSecondaryDisplayWithNegativeOrigin() {
@@ -77,7 +77,7 @@ final class ThumbnailLayoutTests: XCTestCase {
         for f in frames {
             XCTAssertTrue(studioLeft.contains(f), "\(f) が \(studioLeft) からはみ出す")
         }
-        XCTAssertEqual(frames[0].maxX, -ThumbnailLayout.margin)
+        XCTAssertEqual(frames[0].minX, -2560 + ThumbnailLayout.margin)
     }
 
     func testOverflowKeepsFive() {

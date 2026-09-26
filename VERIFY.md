@@ -57,7 +57,7 @@ B=(open -n -g "/Applications/mycap Dev.app" --args)
 "${B[@]}" --style-open "$PWD/Tests/Fixtures/ocr-ja-en.png"; "${B[@]}" --style-snapshot $S/style-panel.png --style-close
 ```
 
-- 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の右端 = visibleFrame.maxX − 16、下端 = visibleFrame.minY + 16 になる
+- 位置の突き合わせは、画面の frame / visibleFrame を `swift` の小さなスクリプトで出す（`NSScreen.screens` の `NSScreenNumber` と `visibleFrame`）。最新の frame の左端 = visibleFrame.minX + 16、下端 = visibleFrame.minY + 16 になる
 - 同じ秒に複数枚入れると `_2` `_3` が付く
 - `--snapshot` はプロセス内描画なので画面収録の許可は要らない。角丸・影は写らない（レイアウトとボタンの確認用）
 - `--full` を許可なしで撃つと `CGRequestScreenCaptureAccess()` が OS のダイアログを出すことがある（ユーザーの画面に出る）

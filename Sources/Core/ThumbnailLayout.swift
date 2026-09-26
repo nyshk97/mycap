@@ -18,11 +18,11 @@ enum ThumbnailLayout {
         return CGSize(width: max(fitted.width, minPanel.width), height: max(fitted.height, minPanel.height))
     }
 
-    /// `sizes[0]` が最新。最新を画面の右下に置き、古いものほど上へ積む
+    /// `sizes[0]` が最新。最新を画面の左下に置き、古いものほど上へ積む
     static func frames(visible: CGRect, sizes: [CGSize]) -> [CGRect] {
         var y = visible.minY + margin
         return sizes.map { size in
-            let frame = CGRect(x: visible.maxX - margin - size.width, y: y, width: size.width, height: size.height)
+            let frame = CGRect(x: visible.minX + margin, y: y, width: size.width, height: size.height)
             y += size.height + spacing
             return frame
         }

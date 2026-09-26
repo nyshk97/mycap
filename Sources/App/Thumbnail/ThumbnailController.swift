@@ -1,7 +1,7 @@
 import AppKit
 import AVFoundation
 
-/// 撮影後のサムネイルの束。撮った画面の右下に最新を置き、古いものほど上へ積む。
+/// 撮影後のサムネイルの束。撮った画面の左下に最新を置き、古いものほど上へ積む。
 /// 自動では消えない。最大 5 枚で、あふれたら古いものから閉じる（キャッシュのファイルは 24 時間残る）
 final class ThumbnailController {
     private struct Item {
