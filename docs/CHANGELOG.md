@@ -44,6 +44,8 @@ mycap の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-26
+
 ### ✨ Added
 - オールインワン（⌘⇧5）。範囲をドラッグで選び、下に出るツールバーからその範囲を撮る（Capture）・3 秒後に撮る（Timer）・録画する（Recording）を選ぶ。範囲は移動・四隅と四辺で大きさの変更・W × H の数値入力ができる
 - Scrolling のボタン（今は表示だけ）
