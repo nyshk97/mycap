@@ -177,6 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `--edit-undo` / `--edit-dump`（要素・選択・取り消しの深さをログへ）/ `--edit-snapshot <png>` / `--edit-save`（保存してサムネイルを置き換える）/ `--edit-close`（確認なしで破棄）
     /// `--history-open [screenshots|videos]`: キャプチャ履歴を開く（アクティブにしない）/ `--history-dump`: タブ・件数・フォーカス・各項目をログへ
     /// `--history-focus <n>` / `--history-kind <screenshots|videos>` / `--history-restore`（フォーカス中を戻す）/ `--history-snapshot <png>` / `--history-close`
+    /// `--record-audio <mic,system|mic|system|none>`: 録画に入れる音声を設定する（ツールバーのトグルと同じ UserDefaults に書く）。録画のフックより前に置く
+    /// `--mix-audio <in.mp4>`: 録画の停止後と同じ経路で音声トラックを 1 本に混ぜ、一時ファイルに書いてログに出す（許可が要らない。サムネイルには出さない）
     /// `--record-display <秒>`: カウントダウンを飛ばして、マウスのある画面を指定秒数だけ録る（許可が要る）
     /// `--aio-capture <x> <y> <w> <h>`: オールインワンで範囲を選んで Capture した後の経路（マウスのある画面・左上原点のポイント。許可が要る）
     /// `--aio-record <x> <y> <w> <h> <秒>`: カウントダウンを飛ばして、その範囲を指定秒数だけ録る（許可が要る）
@@ -299,6 +301,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Log.write("hook.record_bar_snapshot path=\(path) ok=\(RecordingBar.snapshot(to: path))")
             case "--record-stop-bar":
                 capture.recorder.stop(reason: "bar")
+            case "--record-audio":
+                if let v = arg() {
+                    let parts = Set(v.split(separator: ",").map(String.init))
+                    RecordingAudio.save(RecordingAudio(mic: parts.contains("mic"), system: parts.contains("system")))
+                    Log.write("hook.record_audio \(RecordingAudio.load())")
+                }
+            case "--mix-audio":
+                if let path = arg() {
+                    let src = URL(fileURLWithPath: path)
+                    AudioMixer.audioTrackCount(src) { tracks in
+                        let t0 = Date()
+                        AudioMixer.mix(src) { out in
+                            Log.write("hook.mix_audio tracks=\(tracks) ms=\(Int(Date().timeIntervalSince(t0) * 1000)) out=\(out?.path ?? "-")")
+                        }
+                    }
+                }
             case "--record-display":
                 if let sec = arg().flatMap(Double.init) { capture.recorder.startForTest(seconds: sec) }
             case "--video-open":

@@ -25,7 +25,7 @@ for c in Debug Release; do n=$([ $c = Debug ] && echo "mycap Dev" || echo mycap)
 `clipboard.copied` / `clipboard.copied_file`（録画）/ `thumbnail.added` / `thumbnail.closed reason=button|dragged_out|overflow|copied|saved|ocr|pinned` / `thumbnail.saved` / `thumbnail.replaced old= new= index=` / `thumbnail.key key=esc|cmd_c|cmd_s|cmd_o|cmd_e|cmd_p|space` / `thumbnail.armed name= via=capture|record|restore|replace keys= editor_open= return_to= seconds=`（編集ウィンドウが開いていると keys=0） / `thumbnail.disarmed name= reason=click|app_switch|timeout|next|hover|hover_other|edit|preview|history|aio|hidden|closed ms=`（`app_switch` は `app= after_ms=` も）/ `cache.purged removed= kept=` / `history.opened kind= count= prev=` / `history.restored` / `history.closed reason=escape|toggle|restored|lost_focus|hook` / `store.failed` / `thumbnail.closed_all` / `thumbnail.drag_ended` / `thumbnail.screens_changed` / `toast.shown text= frame=` /
 `ocr.done source=hotkey|thumbnail|pin|hook chars= lines= ms=` / `ocr.failed` / `pin.opened` / `pin.close_requested reason=button|menu` / `pin.closed` / `pin.opacity` /
 `edit.opened px= scale= window=` / `edit.open_blocked`（描きかけがあるのに別の画像を開こうとした）/ `edit.exported name= px= annotations= kinds=` / `edit.discarded` / `edit.render_failed` / `edit.load_failed` /
-`aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= rect=` / `record.bar_shown placement=below|above|inside frame=` /
+`aio.opened screen= frame= app= key=` / `aio.selected rect=` / `aio.size_entered` / `aio.action kind=capture|scrolling|record` / `aio.closed reason=escape|toggle|capture|record` / `capture.aio.captured` / `capture.ignored mode= reason=aio` / `record.region` / `record.started size= mic= system= rect=` / `record.captured audio_tracks=` / `record.mic_requesting` / `record.mic_answered granted=` / `record.mic_denied` / `record.audio_mixed tracks= ms=` / `record.audio_mix_failed` / `aio.audio_toggled kind=mic|system on=` / `hook.record_audio` / `hook.mix_audio tracks= ms= out=` / `record.bar_shown placement=below|above|inside frame=` /
 `scroll.started rect= px= scale=` / `scroll.overlay bar= preview=right|left|inside frame=` / `scroll.frame kind=first|appended|limit|upward|weak|ambiguous|size dy= score= accepted= height=`（変化なしのコマは出さない）/ `scroll.end_pending` / `scroll.finished reason=done|hotkey|menu_bar|limit|cancel|stream_stopped|no_frame|test height= frames=` / `capture.scrolling.captured` /
 `video.opened mode=preview|trim name= size= window=` / `video.trimmed name= start= end=` / `video.trim_unchanged` / `video.trim_cancelled` / `video.trim_failed` / `video.closed` /
 `cleanshot.running`（常用版のみ）/ `launch.forward_to_running`。
@@ -79,6 +79,15 @@ swift scripts/png_diff.swift ~/Library/Caches/mycap-dev/<撮れた名前>.png $S
 "${B[@]}" --scroll-overlay-snapshot 300 150 600 500 $S/ov.png     # 撮影中の枠・バー・プレビューの配置（placement=right）
 "${B[@]}" --scroll-overlay-snapshot 0 0 2560 1440 $S/ov-in.png    # 画面いっぱい → バーは内側の右下、プレビューはその上で止まる（placement=inside）
 "${B[@]}" --scroll-capture 100 100 500 400 2.5   # 実際の SCStream で 2.5 秒撮って Done（許可が要る。枠・バーが画面に出る）→ 手でスクロールしなければ最初の 1 コマ（1000x800・Display P3）
+# 録画の音声。--record-audio はツールバーのトグルと同じ UserDefaults に書くので、録画のフックより前に置き、終わったら none に戻す
+"${B[@]}" --record-audio none --aio-snapshot 400 250 608 455 $S/aio-off.png         # Mic / Sound が斜線で薄い（--record-audio mic,system なら白）
+"${B[@]}" --record-audio system --aio-record 200 150 333 211 3   # record.started mic=false system=true → record.captured audio_tracks=1
+# マイクを入れる録画は初回に OS の許可ダイアログが出るので人が行う（record.mic_answered granted=true → mic=true）
+# 混ぜる処理は許可なしで確かめる（2 本の音声トラックの fixture。440Hz ステレオ＋880Hz モノラル、3 分）
+ffmpeg -v error -y -f lavfi -i testsrc=size=1280x720:rate=30 -f lavfi -i "sine=frequency=440:sample_rate=48000" -f lavfi -i "sine=frequency=880:sample_rate=48000" -t 180 -map 0:v -map 1:a -map 2:a -c:v libx264 -pix_fmt yuv420p -c:a aac -ac:a:0 2 -ac:a:1 1 $S/fx/two.mp4
+"${B[@]}" --mix-audio $S/fx/two.mp4   # hook.mix_audio tracks=2 ms=（3 分で約 1.1 秒）out=<一時ファイル>
+# out を ffprobe して音声が 1 本・2ch・180 秒、映像は元とビット一致（-map 0:v -c copy -f h264 - を cmp）。
+# 両方の音が残っていること: -af "bandpass=f=440:w=40,volumedetect" と f=880 の mean_volume がどちらも -25dB 前後（無関係な 1500Hz は -50dB 台）
 # 録画中の停止バー: 範囲の右下の外 → 右上の外 → 範囲の内側の右下（record.bar_shown placement=）。■ を押したのと同じ経路で止める → record.captured reason=bar
 "${B[@]}" --record-bar-snapshot $S/bar.png                                   # バーだけを描く（経過時間は 0:12 固定）
 "${B[@]}" --aio-record 0 0 2560 1440 30; sleep 5; screencapture -x -D 2 $S/screen.png; "${B[@]}" --record-stop-bar

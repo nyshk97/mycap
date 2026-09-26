@@ -21,4 +21,8 @@ enum RecordingFormat {
         let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%d:%02d", m, sec)
     }
+
+    /// 停止後に音声を 1 トラックへ混ぜ直すか。マイクとシステム音が別トラックで書かれたときだけ
+    /// （ブラウザ・Slack のプレビューは 1 本目の音声トラックしか鳴らさないことが多い）
+    static func needsAudioMix(audioTracks: Int) -> Bool { audioTracks >= 2 }
 }

@@ -3,10 +3,12 @@ import AVFoundation
 import ScreenCaptureKit
 
 /// 動画録画。オールインワン（⌘⇧5）で選んだ範囲を、3 秒のカウントダウンのあと
-/// SCRecordingOutput で mp4（1x・H.264・30fps・カーソルあり）に書く。
+/// SCRecordingOutput で mp4（1x・H.264・30fps・カーソルあり）に書く。音声（マイク・システム音）は `RecordingAudio` のとおり。
+/// 両方入れて別トラックに書かれたら、停止後に `AudioMixer` で 1 トラックへ混ぜ直す。
 /// 録画中は範囲の外側に枠と停止バーを出す（mycap のウィンドウはフィルタで外すうえ、枠は範囲の外なので写らない）
 final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
-    enum State: String { case idle, countdown, recording, stopping }
+    /// countdown はマイクの許可の返事を待つ間も含む。finishing は停止後に音声を混ぜ直している間
+    enum State: String { case idle, countdown, recording, stopping, finishing }
 
     private(set) var state: State = .idle { didSet { onStateChange?() } }
     private(set) var startedAt: Date?
@@ -25,14 +27,25 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
     private var stopReason = "user"
     /// 履歴のアイコン用。オールインワンを開いたときの前面アプリ
     private var sourceApp: String?
+    /// マイクの許可の返事を待っている録画の開始。⌘⇧5 で取り消すと nil にし、返事が来ても始めない
+    private var pendingStart: UUID?
+    /// この録画に実際に入れた音声（許可が無ければマイクは外れる）
+    private var audio = RecordingAudio(mic: false, system: false)
 
     /// ⌘⇧5 の振り分け（`AIOController`）から: カウントダウン中ならキャンセル、録画中なら停止
     func toggle() {
         switch state {
         case .idle: Log.write("record.toggle_ignored state=idle")
-        case .countdown: countdown.cancel()
+        case .countdown:
+            if pendingStart != nil {
+                pendingStart = nil
+                state = .idle
+                Log.write("record.cancelled_while_mic_request")
+            } else {
+                countdown.cancel()
+            }
         case .recording: stop(reason: "user")
-        case .stopping: break
+        case .stopping, .finishing: break
         }
     }
 
@@ -46,11 +59,26 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         targetScreen = screen
         state = .countdown
         Log.write("record.region screen=\(screen.displayID) rect=\(NSStringFromRect(rect))")
-        countdown.start(seconds: 3, on: screen, finish: { [weak self] in
-            self?.begin(screen: screen, rect: rect)
-        }, cancel: { [weak self] in
-            self?.state = .idle
-        })
+        resolveAudio { [weak self] in
+            self?.countdown.start(seconds: 3, on: screen, finish: { [weak self] in
+                self?.begin(screen: screen, rect: rect)
+            }, cancel: { [weak self] in
+                self?.state = .idle
+            })
+        }
+    }
+
+    /// 音声の設定を読み、マイク ON なら許可を確かめてから `then` を呼ぶ（呼ぶ側は state を .countdown にしておく）。
+    /// 返事を待つ間に ⌘⇧5 で取り消されたら呼ばない
+    private func resolveAudio(then: @escaping () -> Void) {
+        let token = UUID()
+        pendingStart = token
+        RecordingAudio.resolve(RecordingAudio.load()) { [weak self] audio in
+            guard let self, pendingStart == token, state == .countdown else { return }
+            pendingStart = nil
+            self.audio = audio
+            then()
+        }
     }
 
     /// 検証フック `--record-display <秒>` / `--aio-record x y w h <秒>`: カウントダウンを飛ばして、マウスのある画面（か、その範囲）を録る
@@ -59,8 +87,11 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         targetScreen = .underMouse
         sourceApp = CaptureStore.frontmostAppID()
         state = .countdown
-        begin(screen: targetScreen, rect: rect)
-        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in self?.stop(reason: "test") }
+        resolveAudio { [weak self] in
+            guard let self else { return }
+            begin(screen: targetScreen, rect: rect)
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in self?.stop(reason: "test") }
+        }
     }
 
     // MARK: - 録画
@@ -95,7 +126,9 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         config.height = size.height
         config.minimumFrameInterval = CMTime(value: 1, timescale: RecordingFormat.fps)
         config.showsCursor = true
-        config.capturesAudio = false
+        config.capturesAudio = audio.system
+        config.excludesCurrentProcessAudio = true
+        config.captureMicrophone = audio.mic
 
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("mycap-\(UUID().uuidString).mp4")
         let rc = SCRecordingOutputConfiguration()
@@ -135,7 +168,7 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
                         self?.stop(reason: "bar")
                     }
                 }
-                Log.write("record.started size=\(size.width)x\(size.height) fps=\(RecordingFormat.fps) rect=\(rect.map { NSStringFromRect($0) } ?? "display")")
+                Log.write("record.started size=\(size.width)x\(size.height) fps=\(RecordingFormat.fps) mic=\(self.audio.mic) system=\(self.audio.system) rect=\(rect.map { NSStringFromRect($0) } ?? "display")")
             }
         }
     }
@@ -194,17 +227,55 @@ final class Recorder: NSObject, SCStreamDelegate, SCRecordingOutputDelegate {
         let reason = stopReason
         let screen = targetScreen
         cleanup()
-        state = .idle
         guard FileManager.default.fileExists(atPath: tmp.path) else {
+            state = .idle
             Log.write("record.no_file reason=\(reason)")
             Toast.shared.show("録画を保存できませんでした")
             return
         }
-        guard let saved = CaptureStore.keep(tmp, app: sourceApp) else {
+        // 混ぜ直す間は finishing（⌘⇧5 は受けず、停止のタイムアウトからも再び入らない）
+        state = .finishing
+        AudioMixer.audioTrackCount(tmp) { [weak self] tracks in
+            guard let self else { return }
+            guard RecordingFormat.needsAudioMix(audioTracks: tracks) else {
+                return keep(tmp, tracks: tracks, duration: duration, reason: reason, screen: screen)
+            }
+            let t0 = Date()
+            var settled = false
+            // 片方の入力が止まって返ってこないときも録画を失わない。3 分で約 1 秒なので、長さの半分（最低 15 秒）で見切る
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(15, duration / 2)) { [weak self] in
+                guard let self, !settled else { return }
+                settled = true
+                Log.write("record.audio_mix_failed reason=timeout")
+                keep(tmp, tracks: tracks, duration: duration, reason: reason, screen: screen)
+            }
+            AudioMixer.mix(tmp) { [weak self] mixed in
+                guard !settled else {
+                    if let mixed { try? FileManager.default.removeItem(at: mixed) }
+                    return
+                }
+                settled = true
+                guard let self else { return }
+                let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                if let mixed {
+                    Log.write("record.audio_mixed tracks=\(tracks) ms=\(ms)")
+                    try? FileManager.default.removeItem(at: tmp)
+                    keep(mixed, tracks: 1, duration: duration, reason: reason, screen: screen)
+                } else {
+                    // 失敗したら 2 トラックのまま置く（録画を失わない）
+                    keep(tmp, tracks: tracks, duration: duration, reason: reason, screen: screen)
+                }
+            }
+        }
+    }
+
+    private func keep(_ file: URL, tracks: Int, duration: TimeInterval, reason: String, screen: NSScreen) {
+        state = .idle
+        guard let saved = CaptureStore.keep(file, app: sourceApp) else {
             Toast.shared.show("録画を置けませんでした: \(Env.cacheDir.path)")
             return
         }
-        Log.write("record.captured path=\(saved.path) seconds=\(String(format: "%.1f", duration)) reason=\(reason)")
+        Log.write("record.captured path=\(saved.path) seconds=\(String(format: "%.1f", duration)) reason=\(reason) audio_tracks=\(tracks)")
         if reason == "stream_stopped" { Toast.shared.show("録画が途中で止まりました。そこまでを保存しました") }
         onSaved?(saved, screen)
     }

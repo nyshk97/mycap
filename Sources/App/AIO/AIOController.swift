@@ -109,6 +109,7 @@ final class AIOController {
         selectionView = view
         hosting = h
         model.size = .zero
+        model.audio = RecordingAudio.load()
         return p
     }
 

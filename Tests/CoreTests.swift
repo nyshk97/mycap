@@ -206,6 +206,12 @@ final class RecordingFormatTests: XCTestCase {
         XCTAssertEqual(RecordingFormat.elapsed(754), "12:34")
         XCTAssertEqual(RecordingFormat.elapsed(3723), "1:02:03")
     }
+
+    func testAudioMixOnlyWhenMultipleTracks() {
+        XCTAssertFalse(RecordingFormat.needsAudioMix(audioTracks: 0))
+        XCTAssertFalse(RecordingFormat.needsAudioMix(audioTracks: 1))
+        XCTAssertTrue(RecordingFormat.needsAudioMix(audioTracks: 2))
+    }
 }
 
 final class CacheRetentionTests: XCTestCase {

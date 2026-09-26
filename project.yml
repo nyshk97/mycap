@@ -67,6 +67,8 @@ targets:
         LSUIElement: true
         NSPrincipalClass: NSApplication
         NSHumanReadableCopyright: ""
+        # 録画にマイクを入れるとき（オールインワンのツールバーのトグル）
+        NSMicrophoneUsageDescription: 録画にマイクの音声を入れるために使います。
         # Sparkle。アップデータの起動は #if !DEBUG でガードし、feed URL も Release 構成にだけ
         # 入れる二重防御（Debug では MYCAP_SU_FEED_URL が未定義で空文字になる）
         SUFeedURL: $(MYCAP_SU_FEED_URL)

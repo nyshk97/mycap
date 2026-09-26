@@ -9,6 +9,15 @@ enum AIOAction: String {
 final class AIOModel: ObservableObject {
     /// 選んだ範囲の大きさ（ポイント）
     @Published var size: CGSize = .zero
+    /// 録画に入れる音声の表示用の写し。正は UserDefaults（`RecordingAudio`）で、開くときに読み直す
+    @Published var audio = RecordingAudio.load()
+
+    /// ツールバーのトグル。UserDefaults に書く（Recorder は録画の開始時にそちらを読む）
+    func toggleAudio(mic: Bool) {
+        if mic { audio.mic.toggle() } else { audio.system.toggle() }
+        RecordingAudio.save(audio)
+        Log.write("aio.audio_toggled kind=\(mic ? "mic" : "system") on=\(mic ? audio.mic : audio.system)")
+    }
     var onAction: ((AIOAction) -> Void)?
     /// W / H 欄で Enter を押した（変えなかった側は nil）
     var onSizeEntered: ((CGFloat?, CGFloat?) -> Void)?
@@ -27,6 +36,10 @@ struct AIOToolbar: View {
                 AIOToolButton(title: "Scrolling", symbol: "arrow.down", help: "スクロールしながら縦に長く撮る") { model.onAction?(.scrolling) }
                 Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: 38).padding(.horizontal, 4)
                 AIOToolButton(title: "Recording", symbol: "video") { model.onAction?(.record) }
+                AIOAudioToggle(title: "Mic", on: model.audio.mic, onSymbol: "mic", offSymbol: "mic.slash",
+                               help: "録画にマイクの音を入れる") { model.toggleAudio(mic: true) }
+                AIOAudioToggle(title: "Sound", on: model.audio.system, onSymbol: "speaker.wave.2", offSymbol: "speaker.slash",
+                               help: "録画に Mac から出る音を入れる") { model.toggleAudio(mic: false) }
             }
             .padding(6)
             .background(AIOCapsule())
@@ -84,6 +97,35 @@ private struct AIOToolButton: View {
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .help(help ?? "")
+    }
+}
+
+/// 録画の音声のトグル。OFF は斜線のアイコンを薄く、ON は白く
+private struct AIOAudioToggle: View {
+    let title: String
+    let on: Bool
+    let onSymbol: String
+    let offSymbol: String
+    let help: String
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: on ? onSymbol : offSymbol).font(.system(size: 15, weight: .medium)).frame(height: 20)
+                Text(title).font(.system(size: 11.5))
+            }
+            .foregroundStyle(.white.opacity(on ? 0.92 : 0.4))
+            .frame(minWidth: 44)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.white.opacity(hovered ? 0.1 : 0)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+        .help(help)
     }
 }
 
