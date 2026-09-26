@@ -1,10 +1,10 @@
 import AppKit
 import Carbon
 
-/// 録画・タイマー撮影の前の 3 秒のカウントダウン。画面中央に大きく出す。Esc（またはホットキーの再押下）でキャンセルできる。
-/// 録画・撮影はカウントダウンを閉じてから始めるので、この表示は写らない
+/// 録画の前の 3 秒のカウントダウン。画面中央に大きく出す。Esc（またはホットキーの再押下）でキャンセルできる。
+/// 録画はカウントダウンを閉じてから始めるので、この表示は写らない
 final class Countdown {
-    /// ログの接頭辞（`record` / `timer`）
+    /// ログの接頭辞（`record`）
     private let logPrefix: String
 
     init(logPrefix: String) {

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum AIOAction: String {
-    case capture, scrolling, timer, record
+    case capture, scrolling, record
 }
 
 /// ツールバーと W × H 欄の状態。範囲そのものは `AIOSelectionView` が持ち、ここへは大きさだけ写す
@@ -16,7 +16,7 @@ final class AIOModel: ObservableObject {
     var onEditEnded: (() -> Void)?
 }
 
-/// CleanShot X の All-In-One に倣ったツールバー。Capture / Scrolling / Timer ｜ Recording と、右に W × H
+/// CleanShot X の All-In-One に倣ったツールバー。Capture / Scrolling ｜ Recording と、右に W × H
 struct AIOToolbar: View {
     @ObservedObject var model: AIOModel
 
@@ -25,7 +25,6 @@ struct AIOToolbar: View {
             HStack(spacing: 2) {
                 AIOToolButton(title: "Capture", symbol: "viewfinder") { model.onAction?(.capture) }
                 AIOToolButton(title: "Scrolling", symbol: "arrow.down", help: "準備中") { model.onAction?(.scrolling) }
-                AIOToolButton(title: "Timer", symbol: "timer") { model.onAction?(.timer) }
                 Rectangle().fill(Color.white.opacity(0.14)).frame(width: 1, height: 38).padding(.horizontal, 4)
                 AIOToolButton(title: "Recording", symbol: "video") { model.onAction?(.record) }
             }

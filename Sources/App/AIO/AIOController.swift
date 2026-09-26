@@ -8,11 +8,10 @@ final class AIOPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// オールインワン（⌘⇧5）。マウスのあるディスプレイに暗幕を出して範囲を選ばせ、Capture / Timer / Recording をその範囲に行う。
+/// オールインワン（⌘⇧5）。マウスのあるディスプレイに暗幕を出して範囲を選ばせ、Capture / Recording をその範囲に行う。
 /// ⌘⇧5 の振り分け（録画・カウントダウン・暗幕の開閉）もここで行う
 final class AIOController {
     private let recorder: Recorder
-    private let countdown = Countdown(logPrefix: "timer")
 
     private var panel: AIOPanel?
     private var selectionView: AIOSelectionView?
@@ -30,8 +29,8 @@ final class AIOController {
     var onCapture: ((NSScreen, CGRect, String?) -> Void)?
 
     var isOpen: Bool { panel != nil }
-    /// 暗幕かタイマーのカウントダウンが出ている（ほかの撮影のホットキーを無視する）
-    var isBusy: Bool { isOpen || countdown.isRunning }
+    /// 暗幕が出ている（ほかの撮影のホットキーを無視する）
+    var isBusy: Bool { isOpen }
 
     init(recorder: Recorder) {
         self.recorder = recorder
@@ -43,12 +42,10 @@ final class AIOController {
         }
     }
 
-    /// ⌘⇧5: 録画中・録画のカウントダウン中 → 停止／キャンセル、タイマーのカウントダウン中 → キャンセル、暗幕が出ている → 閉じる、どれでもない → 開く
+    /// ⌘⇧5: 録画中・録画のカウントダウン中 → 停止／キャンセル、暗幕が出ている → 閉じる、どれでもない → 開く
     func toggle() {
         if recorder.state != .idle {
             recorder.toggle()
-        } else if countdown.isRunning {
-            countdown.cancel()
         } else if isOpen {
             close(reason: "toggle")
         } else {
@@ -88,6 +85,8 @@ final class AIOController {
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.isReleasedWhenClosed = false
         p.acceptsMouseMovedEvents = true
+        // 透明なウィンドウは、描いていない（alpha 0 の）ところのクリックを下のウィンドウへ素通しする。範囲の内側（穴）も受けるよう明示する
+        p.ignoresMouseEvents = false
         p.hidesOnDeactivate = false
 
         let bounds = NSRect(origin: .zero, size: frame.size)
@@ -144,10 +143,6 @@ final class AIOController {
         switch action {
         case .capture:
             onCapture?(screen, rect, app)
-        case .timer:
-            countdown.start(seconds: 3, on: screen, finish: { [weak self] in
-                self?.onCapture?(screen, rect, app)
-            }, cancel: {})
         case .record:
             recorder.start(screen: screen, rect: rect, app: app)
         case .scrolling:

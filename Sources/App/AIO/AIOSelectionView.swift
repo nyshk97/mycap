@@ -43,6 +43,9 @@ final class AIOSelectionView: NSView {
             drawHint()
             return
         }
+        // 穴を完全な透明にすると、そこのクリックが下のアプリへ抜けて移動のドラッグを受けられない。見えない程度に塗っておく
+        NSColor(white: 1, alpha: 0.004).setFill()
+        s.fill()
         NSColor.white.withAlphaComponent(0.9).setStroke()
         let border = NSBezierPath(rect: s.insetBy(dx: -0.5, dy: -0.5))
         border.lineWidth = 1
@@ -163,7 +166,10 @@ final class AIOSelectionView: NSView {
     override func cursorUpdate(with event: NSEvent) { updateCursor(at: convert(event.locationInWindow, from: nil)) }
 
     func updateCursor(at p: CGPoint) {
-        if let h = handle(at: p) {
+        // ツールバー（兄弟のビュー）の上では矢印に戻す。この追跡領域はビュー全体なので、ツールバーの上でも mouseMoved が来る
+        if superview?.subviews.contains(where: { $0 !== self && !$0.isHidden && $0.frame.contains(p) }) == true {
+            NSCursor.arrow.set()
+        } else if let h = handle(at: p) {
             Self.cursor(for: h).set()
         } else if let s = selection, s.contains(p) {
             NSCursor.openHand.set()
