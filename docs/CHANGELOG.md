@@ -44,6 +44,9 @@ Capit の更新履歴。形式は [Keep a Changelog](https://keepachangelog.com/
 
 ## [Unreleased]
 
+### ✨ Added
+- スクロールキャプチャを Return（テンキーの Enter も）でも Done にできるように
+
 ## [1.0.0] - 2026-09-26
 
 ### 📝 Changed
